@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finops.calculate.request.schema.json",
+  "title": "finops.calculate request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nRef": { "type": ["number", "null"], "minimum": 1, "maximum": 100000 },
+        "devPerClient": { "type": ["number", "null"], "minimum": 0 },
+        "infraTotal": { "type": ["number", "null"], "minimum": 0 },
+        "ARPU": { "type": ["number", "null"], "minimum": 0 },
+        "startupTargetPrice": { "type": ["number", "null"], "minimum": 0 },
+        "startupTargetClients": { "type": ["number", "null"], "minimum": 1 },
+        "cudPct": { "type": ["number", "null"], "minimum": 0, "maximum": 95 },
+        "margin": { "type": ["number", "null"], "minimum": 0, "maximum": 200 },
+        "nMax": { "type": ["number", "null"], "minimum": 10, "maximum": 100000 }
+      }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["aws", "azure", "gcp", "oci", "ibm", "alibaba", "huawei", "multi"]
+      },
+      "uniqueItems": true
+    },
+    "hiddenCurves": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["dev", "infra-raw", "infra-cud", "total", "revenue", "profit", "price-min"]
+      },
+      "uniqueItems": true
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "includeHealth": { "type": "boolean", "default": true },
+        "includeRecommendations": { "type": "boolean", "default": true },
+        "includeSeries": { "type": "boolean", "default": false },
+        "includeStateToken": { "type": "boolean", "default": true }
+      }
+    }
+  },
+  "required": ["inputs"]
+}

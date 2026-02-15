@@ -1,0 +1,21 @@
+{
+  "inputs": {
+    "nRef": 120,
+    "devPerClient": 500,
+    "infraTotal": 2400,
+    "ARPU": null,
+    "startupTargetPrice": 35,
+    "startupTargetClients": null,
+    "cudPct": 30,
+    "margin": 15,
+    "nMax": 2000
+  },
+  "providers": ["aws"],
+  "hiddenCurves": ["profit"],
+  "options": {
+    "includeHealth": true,
+    "includeRecommendations": true,
+    "includeSeries": false,
+    "includeStateToken": true
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "finops-calculator-mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP stdio server for FinOps calculator tools",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js && node --check finops-core.js",
+    "test": "node ../tests/run-tests.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

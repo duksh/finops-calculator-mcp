@@ -1,0 +1,60 @@
+{
+  "normalizedInputs": {
+    "nRef": 120,
+    "devPerClient": 500,
+    "infraTotal": 2400,
+    "ARPU": null,
+    "startupTargetPrice": 35,
+    "startupTargetClients": null,
+    "cudPct": 30,
+    "margin": 15,
+    "nMax": 2000
+  },
+  "model": {
+    "K": 431664.83,
+    "a": 0.45,
+    "c": 5.2074,
+    "b": 1.28,
+    "g": 0.7,
+    "ARPU": 35,
+    "m": 0.15,
+    "nMax": 2000
+  },
+  "meta": {
+    "effectiveARPU": 35,
+    "arpuMode": "startup-price",
+    "warnings": []
+  },
+  "outputs": {
+    "breakEvenClients": 51,
+    "minPricePerClient": 27.791666666666664,
+    "vcpu": 20.0,
+    "contributionMargin": 15.0,
+    "ccer": 1.75,
+    "cudMonthlySaving": 1085.213603669809,
+    "requiredClientsAtTargetPrice": 51,
+    "requiredPriceAtTargetClients": null,
+    "targetMonthlyRevenue": 1785
+  },
+  "health": {
+    "zoneKey": "yellow",
+    "zoneTitle": "Yellow Zone - Needs Improvement",
+    "score": 45,
+    "failedChecks": [
+      "No break-even point exists within the current model range.",
+      "CCER is 1.75x (below 3x benchmark).",
+      "Commitment saving gap is 45.2% of infra spend.",
+      "Planning mode: ARPU estimated from target price assumption."
+    ]
+  },
+  "recommendations": [
+    {
+      "title": "CCER below 3x",
+      "priority": "high",
+      "providers": [],
+      "desc": "Revenue generated per euro of cloud spend is under target.",
+      "action": "Isolate top cost drivers and enforce unit economics guardrails."
+    }
+  ],
+  "stateToken": "eyJ2IjoxLCJpIjp7Ii4uLiJ9"
+}

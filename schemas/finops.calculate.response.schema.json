@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finops.calculate.response.schema.json",
+  "title": "finops.calculate response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "normalizedInputs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "K": { "type": "number" },
+        "a": { "type": "number" },
+        "c": { "type": "number" },
+        "b": { "type": "number" },
+        "g": { "type": "number" },
+        "ARPU": { "type": "number" },
+        "m": { "type": "number" },
+        "nMax": { "type": "number" }
+      },
+      "required": ["K", "a", "c", "b", "g", "ARPU", "m", "nMax"]
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "effectiveARPU": { "type": ["number", "null"] },
+        "arpuMode": {
+          "type": "string",
+          "enum": ["manual", "startup-price", "startup-clients", "missing"]
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "breakEvenClients": { "type": ["number", "null"] },
+        "minPricePerClient": { "type": ["number", "null"] },
+        "vcpu": { "type": ["number", "null"] },
+        "contributionMargin": { "type": ["number", "null"] },
+        "ccer": { "type": ["number", "null"] },
+        "cudMonthlySaving": { "type": ["number", "null"] },
+        "requiredClientsAtTargetPrice": { "type": ["number", "null"] },
+        "requiredPriceAtTargetClients": { "type": ["number", "null"] },
+        "targetMonthlyRevenue": { "type": ["number", "null"] }
+      }
+    },
+    "health": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "zoneKey": { "type": "string", "enum": ["green", "yellow", "red", "awaiting"] },
+        "zoneTitle": { "type": "string" },
+        "score": { "type": ["number", "null"] },
+        "failedChecks": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string" },
+          "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+          "providers": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "desc": { "type": "string" },
+          "action": { "type": "string" }
+        },
+        "required": ["title", "priority", "providers", "desc", "action"]
+      }
+    },
+    "stateToken": { "type": ["string", "null"] }
+  },
+  "required": ["normalizedInputs", "model", "meta", "outputs", "recommendations"]
+}
