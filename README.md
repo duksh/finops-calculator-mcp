@@ -10,7 +10,6 @@ This folder is dedicated to all Model Context Protocol (MCP) related work for th
 - `examples/calculate.request.json` - sample request payload
 - `examples/calculate.response.json` - sample response payload
 - `client-config-examples.md` - copy-paste MCP client configuration snippets (Cursor, Windsurf, Claude Desktop)
-- `public-availability-plan.md` - rollout guide for making the MCP publicly consumable
 - `server/finops-core.js` - extracted pure calculator logic for MCP handlers
 - `server/index.js` - MCP stdio server with tool registration and JSON-RPC handling
 - `server/package.json` - scripts for local run/check/test
@@ -19,7 +18,7 @@ This folder is dedicated to all Model Context Protocol (MCP) related work for th
 ## Run MCP server locally
 
 ```bash
-node /absolute/path/to/finops-calculator/mcp/server/index.js
+node /absolute/path/to/finops-calculator-mcp/server/index.js
 ```
 
 Or from the server folder:
@@ -43,21 +42,15 @@ npm run test
 Client integration examples:
 
 ```text
-See mcp/client-config-examples.md
-```
-
-Public rollout plan:
-
-```text
-See mcp/public-availability-plan.md
+See client-config-examples.md
 ```
 
 ## Next implementation steps
 
-1. Choose one rollout path from `mcp/public-availability-plan.md` and execute it.
-2. Add scenario-based golden fixtures for regression coverage.
-3. Add optional schema-runtime validation in server request handling.
+1. Add scenario-based golden fixtures for regression coverage.
+2. Add optional schema-runtime validation in server request handling.
+3. Add hosted transport support if you need shared multi-user access.
 
 ## License
 
-Apache-2.0. See `../LICENSE`.
+Apache-2.0. See `LICENSE`.
