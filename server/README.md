@@ -12,7 +12,7 @@ Minimal MCP server exposing calculator capabilities via JSON-RPC over stdio.
 ## Run locally
 
 ```bash
-node /absolute/path/to/finops-calculator/mcp/server/index.js
+node /absolute/path/to/finops-calculator-mcp/server/index.js
 ```
 
 Or from this folder:
@@ -26,6 +26,7 @@ Validate server files and tests:
 ```bash
 npm run check
 npm run test
+npm run test:parity
 ```
 
 ## Notes

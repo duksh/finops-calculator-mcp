@@ -1,0 +1,33 @@
+name: MCP Parity Guard
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntax check
+        working-directory: server
+        run: npm run check
+
+      - name: MCP tests
+        working-directory: server
+        run: npm run test
+
+      - name: Cross-repo calculator parity
+        working-directory: server
+        env:
+          FINOPS_CALCULATOR_RAW_URL: https://raw.githubusercontent.com/duksh/finops-calculator/main/index.html
+        run: npm run test:parity

@@ -14,6 +14,8 @@ This folder is dedicated to all Model Context Protocol (MCP) related work for th
 - `server/index.js` - MCP stdio server with tool registration and JSON-RPC handling
 - `server/package.json` - scripts for local run/check/test
 - `tests/run-tests.mjs` - contract and JSON-RPC protocol tests
+- `tests/parity-finops-calculator.mjs` - cross-repo parity guard against `duksh/finops-calculator` main `index.html`
+- `.github/workflows/mcp-parity.yml` - CI pipeline running syntax, tests, and parity guard
 
 ## Run MCP server locally
 
@@ -37,6 +39,18 @@ Test suite:
 
 ```bash
 npm run test
+```
+
+Cross-repo parity guard (MCP <-> web calculator):
+
+```bash
+npm run test:parity
+```
+
+Optional override target for parity checks:
+
+```bash
+FINOPS_CALCULATOR_RAW_URL="https://raw.githubusercontent.com/duksh/finops-calculator/main/index.html" npm run test:parity
 ```
 
 Client integration examples:
