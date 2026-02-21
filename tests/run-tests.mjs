@@ -54,6 +54,17 @@ async function runContractTests() {
     responseExample.health?.zoneKey,
     "health zone should match the example response fixture"
   );
+  assert.ok(calculated.outputs.normalization, "normalization output should be present");
+  assert.deepEqual(
+    calculated.outputs.normalization.selectedDomains,
+    responseExample.outputs.normalization.selectedDomains,
+    "selected domains should match example fixture"
+  );
+  assert.equal(
+    calculated.outputs.normalization.weightingPolicy.recommendedMode,
+    "financial-truth",
+    "default weighting policy mode should be financial-truth"
+  );
   assert.ok(Array.isArray(calculated.recommendations), "recommendations should be array");
 
   const health = healthTool({
@@ -69,7 +80,12 @@ async function runContractTests() {
   assert.ok(Array.isArray(recs.recommendations), "recommendation output should be array");
 
   const encoded = encodeStateTool({
-    inputs: { devPerClient: 500, infraTotal: 2400, startupTargetPrice: 35 },
+    inputs: {
+      devPerClient: 500,
+      infraTotal: 2400,
+      startupTargetPrice: 35,
+      techDomains: ["cloud", "saas"]
+    },
     providers: ["aws"],
     hiddenCurves: ["profit"]
   });
@@ -77,6 +93,7 @@ async function runContractTests() {
 
   const decoded = decodeStateTool({ stateToken: encoded.stateToken });
   assert.equal(decoded.state.p[0], "aws", "decoded provider should match encoded state");
+  assert.deepEqual(decoded.state.td, ["cloud", "saas"], "decoded domain scope should match encoded state");
 }
 
 function encodeRpcMessage(message) {
@@ -184,7 +201,13 @@ async function runProtocolTests() {
     const calculateArgs = {
       name: "finops.calculate",
       arguments: {
-        inputs: { devPerClient: 500, infraTotal: 2400, startupTargetPrice: 35 },
+        inputs: {
+          devPerClient: 500,
+          infraTotal: 2400,
+          startupTargetPrice: 35,
+          techDomains: ["cloud", "saas"],
+          costSaaS: 600
+        },
         providers: ["aws"]
       }
     };
@@ -197,6 +220,11 @@ async function runProtocolTests() {
       payload.outputs.breakEvenClients,
       expectedFromCore.outputs.breakEvenClients,
       "tools/call returned unexpected break-even"
+    );
+    assert.deepEqual(
+      payload.outputs.normalization.selectedDomains,
+      ["cloud", "saas"],
+      "tools/call should return scoped selected domains"
     );
     assert.ok(Array.isArray(payload.recommendations), "tools/call recommendations should be array");
 

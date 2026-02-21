@@ -51,7 +51,61 @@
         "cudMonthlySaving": { "type": ["number", "null"] },
         "requiredClientsAtTargetPrice": { "type": ["number", "null"] },
         "requiredPriceAtTargetClients": { "type": ["number", "null"] },
-        "targetMonthlyRevenue": { "type": ["number", "null"] }
+        "targetMonthlyRevenue": { "type": ["number", "null"] },
+        "normalization": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "selectedDomains": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "selectedCount": { "type": "number" },
+            "providedInScopeCount": { "type": "number" },
+            "totalTrackedDomains": { "type": "number" },
+            "schemaCoveragePct": { "type": "number" },
+            "coveragePct": { "type": "number" },
+            "totalMonthly": { "type": "number" },
+            "normalizedTechCostPerClient": { "type": "number" },
+            "confidence": { "type": "string", "enum": ["Low", "Medium", "High"] },
+            "warnings": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "advisories": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "formula": { "type": "string" },
+            "weightingPolicy": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "recommendedMode": { "type": "string" },
+                "financialTruthRule": { "type": "string" },
+                "optionalPriorityIndexRule": { "type": "string" },
+                "bands": { "type": "object", "additionalProperties": true },
+                "balancedDefaultProfile": { "type": "object", "additionalProperties": true }
+              }
+            },
+            "domainRows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "key": { "type": "string" },
+                  "label": { "type": "string" },
+                  "inputKey": { "type": "string" },
+                  "inScope": { "type": "boolean" },
+                  "provided": { "type": "boolean" },
+                  "monthly": { "type": "number" },
+                  "normalized": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "health": {

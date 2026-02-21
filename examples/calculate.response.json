@@ -3,17 +3,23 @@
     "nRef": 120,
     "devPerClient": 500,
     "infraTotal": 2400,
+    "techDomains": ["cloud", "saas"],
+    "costSaaS": 600,
     "ARPU": null,
     "startupTargetPrice": 35,
     "startupTargetClients": null,
     "cudPct": 30,
     "margin": 15,
-    "nMax": 2000
+    "nMax": 2000,
+    "costLicensing": null,
+    "costPrivateCloud": null,
+    "costDataCenter": null,
+    "costLabor": null
   },
   "model": {
-    "K": 431664.83,
+    "K": 4311.2336967072515,
     "a": 0.45,
-    "c": 5.2074,
+    "c": 5.234307671241207,
     "b": 1.28,
     "g": 0.7,
     "ARPU": 35,
@@ -34,7 +40,50 @@
     "cudMonthlySaving": 1085.213603669809,
     "requiredClientsAtTargetPrice": 51,
     "requiredPriceAtTargetClients": null,
-    "targetMonthlyRevenue": 1785
+    "targetMonthlyRevenue": 1785,
+    "normalization": {
+      "selectedDomains": ["cloud", "saas"],
+      "selectedCount": 2,
+      "providedInScopeCount": 2,
+      "totalTrackedDomains": 6,
+      "schemaCoveragePct": 33.33333333333333,
+      "coveragePct": 100,
+      "totalMonthly": 3000,
+      "normalizedTechCostPerClient": 25,
+      "confidence": "High",
+      "warnings": [],
+      "advisories": [],
+      "formula": "NTC/client = sum(alpha_d * C_d) / n",
+      "weightingPolicy": {
+        "recommendedMode": "financial-truth",
+        "financialTruthRule": "alpha_d = 1 if selected in scope, else 0",
+        "optionalPriorityIndexRule": "sum(w_d) = 1",
+        "bands": {
+          "cloud": [0.25, 0.45],
+          "saas": [0.15, 0.3],
+          "licensing": [0.08, 0.2],
+          "private-cloud": [0.05, 0.2],
+          "data-center": [0.03, 0.15],
+          "labor": [0.08, 0.2]
+        },
+        "balancedDefaultProfile": {
+          "cloud": 0.35,
+          "saas": 0.2,
+          "licensing": 0.12,
+          "private-cloud": 0.13,
+          "data-center": 0.08,
+          "labor": 0.12
+        }
+      },
+      "domainRows": [
+        { "key": "cloud", "label": "Cloud", "inputKey": "infraTotal", "inScope": true, "provided": true, "monthly": 2400, "normalized": 20 },
+        { "key": "saas", "label": "SaaS", "inputKey": "costSaaS", "inScope": true, "provided": true, "monthly": 600, "normalized": 5 },
+        { "key": "licensing", "label": "Licensing", "inputKey": "costLicensing", "inScope": false, "provided": false, "monthly": 0, "normalized": 0 },
+        { "key": "private-cloud", "label": "Private Cloud", "inputKey": "costPrivateCloud", "inScope": false, "provided": false, "monthly": 0, "normalized": 0 },
+        { "key": "data-center", "label": "Data Center", "inputKey": "costDataCenter", "inScope": false, "provided": false, "monthly": 0, "normalized": 0 },
+        { "key": "labor", "label": "Labor", "inputKey": "costLabor", "inScope": false, "provided": false, "monthly": 0, "normalized": 0 }
+      ]
+    }
   },
   "health": {
     "zoneKey": "yellow",
@@ -52,9 +101,9 @@
       "title": "CCER below 3x",
       "priority": "high",
       "providers": [],
-      "desc": "Revenue generated per euro of cloud spend is under target.",
-      "action": "Isolate top cost drivers and enforce unit economics guardrails."
+      "desc": "Cloud Cost Efficiency Ratio is below FinOps benchmark. Revenue generated per euro of cloud spend is under target.",
+      "action": "Isolate top cost drivers and enforce unit economics guardrails per service."
     }
   ],
-  "stateToken": "eyJ2IjoxLCJpIjp7Ii4uLiJ9"
+  "stateToken": "eyJ2IjoxLCJpIjp7Im5SZWYiOiIxMjAiLCJkZXZQZXJDbGllbnQiOiI1MDAiLCJpbmZyYVRvdGFsIjoiMjQwMCIsInN0YXJ0dXBUYXJnZXRQcmljZSI6IjM1IiwiY3VkUGN0IjoiMzAiLCJtYXJnaW4iOiIxNSIsIm5NYXgiOiIyMDAwIiwiY29zdFNhYVMiOiI2MDAifSwidGQiOlsiY2xvdWQiLCJzYWFzIl0sInAiOlsiYXdzIl0sImgiOlsicHJvZml0Il19"
 }

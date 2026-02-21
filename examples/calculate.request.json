@@ -3,6 +3,8 @@
     "nRef": 120,
     "devPerClient": 500,
     "infraTotal": 2400,
+    "techDomains": ["cloud", "saas"],
+    "costSaaS": 600,
     "ARPU": null,
     "startupTargetPrice": 35,
     "startupTargetClients": null,

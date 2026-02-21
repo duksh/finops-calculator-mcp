@@ -17,7 +17,20 @@
         "startupTargetClients": { "type": ["number", "null"], "minimum": 1 },
         "cudPct": { "type": ["number", "null"], "minimum": 0, "maximum": 95 },
         "margin": { "type": ["number", "null"], "minimum": 0, "maximum": 200 },
-        "nMax": { "type": ["number", "null"], "minimum": 10, "maximum": 100000 }
+        "nMax": { "type": ["number", "null"], "minimum": 10, "maximum": 100000 },
+        "techDomains": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["cloud", "saas", "licensing", "private-cloud", "data-center", "labor"]
+          },
+          "uniqueItems": true
+        },
+        "costSaaS": { "type": ["number", "null"], "minimum": 0 },
+        "costLicensing": { "type": ["number", "null"], "minimum": 0 },
+        "costPrivateCloud": { "type": ["number", "null"], "minimum": 0 },
+        "costDataCenter": { "type": ["number", "null"], "minimum": 0 },
+        "costLabor": { "type": ["number", "null"], "minimum": 0 }
       }
     },
     "providers": {

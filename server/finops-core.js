@@ -14,6 +14,32 @@ const SHARE_STATE_VERSION = 1;
 
 const PROVIDERS = Object.freeze(["aws", "azure", "gcp", "oci", "ibm", "alibaba", "huawei", "multi"]);
 const CURVE_KEYS = Object.freeze(["dev", "infra-raw", "infra-cud", "total", "revenue", "profit", "price-min"]);
+const TECH_DOMAIN_SCHEMA = Object.freeze([
+  { key: "cloud", inputKey: "infraTotal", label: "Cloud" },
+  { key: "saas", inputKey: "costSaaS", label: "SaaS" },
+  { key: "licensing", inputKey: "costLicensing", label: "Licensing" },
+  { key: "private-cloud", inputKey: "costPrivateCloud", label: "Private Cloud" },
+  { key: "data-center", inputKey: "costDataCenter", label: "Data Center" },
+  { key: "labor", inputKey: "costLabor", label: "Labor" }
+]);
+const DEFAULT_TECH_DOMAINS = Object.freeze(["cloud"]);
+const VALID_TECH_DOMAIN_KEYS = Object.freeze(TECH_DOMAIN_SCHEMA.map((item) => item.key));
+const PRIORITY_WEIGHT_BANDS = Object.freeze({
+  cloud: [0.25, 0.45],
+  saas: [0.15, 0.30],
+  licensing: [0.08, 0.20],
+  "private-cloud": [0.05, 0.20],
+  "data-center": [0.03, 0.15],
+  labor: [0.08, 0.20]
+});
+const BALANCED_PRIORITY_PROFILE = Object.freeze({
+  cloud: 0.35,
+  saas: 0.20,
+  licensing: 0.12,
+  "private-cloud": 0.13,
+  "data-center": 0.08,
+  labor: 0.12
+});
 
 const RECOMMENDATIONS = Object.freeze([
   { title: "You are below break-even", desc: "Current client volume is below the minimum viable threshold; fixed and variable costs are not yet recovered.", action: "Review pricing page and sales funnel conversion. Prioritize moving n above N_min within the next planning cycle.", providers: [], zones: ["red"], priority: "high" },
@@ -66,6 +92,20 @@ function normalizeNumber(value, config = {}) {
   return normalized;
 }
 
+function normalizeTechDomains(value) {
+  if (!Array.isArray(value)) return [...DEFAULT_TECH_DOMAINS];
+  const deduped = [];
+  const seen = new Set();
+  value.forEach((entry) => {
+    if (typeof entry !== "string") return;
+    if (!VALID_TECH_DOMAIN_KEYS.includes(entry)) return;
+    if (seen.has(entry)) return;
+    seen.add(entry);
+    deduped.push(entry);
+  });
+  return deduped.length ? deduped : [...DEFAULT_TECH_DOMAINS];
+}
+
 export function normalizeInputs(inputs = {}) {
   return {
     nRef: normalizeNumber(inputs.nRef, { min: 1, max: 100000, integer: true }),
@@ -76,7 +116,13 @@ export function normalizeInputs(inputs = {}) {
     startupTargetClients: normalizeNumber(inputs.startupTargetClients, { min: 1, integer: true }),
     cudPct: normalizeNumber(inputs.cudPct, { min: 0, max: 95 }),
     margin: normalizeNumber(inputs.margin, { min: 0, max: 200 }),
-    nMax: normalizeNumber(inputs.nMax, { min: 10, max: 100000, integer: true })
+    nMax: normalizeNumber(inputs.nMax, { min: 10, max: 100000, integer: true }),
+    techDomains: normalizeTechDomains(inputs.techDomains),
+    costSaaS: normalizeNumber(inputs.costSaaS, { min: 0 }),
+    costLicensing: normalizeNumber(inputs.costLicensing, { min: 0 }),
+    costPrivateCloud: normalizeNumber(inputs.costPrivateCloud, { min: 0 }),
+    costDataCenter: normalizeNumber(inputs.costDataCenter, { min: 0 }),
+    costLabor: normalizeNumber(inputs.costLabor, { min: 0 })
   };
 }
 
@@ -159,6 +205,83 @@ export function findRequiredClientsForTargetPrice(targetPrice, maxN, model) {
   return null;
 }
 
+export function buildNormalizationSnapshot(inputs = {}) {
+  const nSample = isFiniteNumber(inputs.nRef) && inputs.nRef > 0 ? inputs.nRef : DEFAULT_N_REF;
+  const selectedDomains = normalizeTechDomains(inputs.techDomains);
+  const selectedSet = new Set(selectedDomains);
+
+  const rows = TECH_DOMAIN_SCHEMA.map((def) => {
+    const raw = inputs[def.inputKey];
+    const monthly = isFiniteNumber(raw) && raw > 0 ? raw : 0;
+    const provided = monthly > 0;
+    const inScope = selectedSet.has(def.key);
+    return {
+      key: def.key,
+      label: def.label,
+      inputKey: def.inputKey,
+      inScope,
+      provided,
+      monthly,
+      normalized: monthly / nSample
+    };
+  });
+
+  const inScopeRows = rows.filter((row) => row.inScope);
+  const selectedCount = inScopeRows.length;
+  const providedInScopeCount = inScopeRows.filter((row) => row.provided).length;
+  const providedCount = rows.filter((row) => row.provided).length;
+  const totalTrackedDomains = rows.length;
+  const schemaCoveragePct = (providedCount / totalTrackedDomains) * 100;
+  const coveragePct = selectedCount > 0 ? (providedInScopeCount / selectedCount) * 100 : 0;
+  const totalMonthly = inScopeRows.reduce((sum, row) => sum + row.monthly, 0);
+  const normalizedTotal = selectedCount > 0 ? totalMonthly / nSample : 0;
+  const nonCloudInScope = inScopeRows.some((row) => row.key !== "cloud");
+  const nonCloudProvidedInScope = inScopeRows.some((row) => row.key !== "cloud" && row.provided);
+
+  let confidence = "Low";
+  if (coveragePct >= 80 && selectedCount >= 2 && nonCloudProvidedInScope) confidence = "High";
+  else if (coveragePct >= 50) confidence = "Medium";
+
+  const warnings = [];
+  const advisories = [];
+  if (!(isFiniteNumber(inputs.nRef) && inputs.nRef > 0) && totalMonthly > 0) {
+    warnings.push(`Normalization uses default client baseline n=${DEFAULT_N_REF}. Add nRef for exact comparability.`);
+  }
+  if (selectedCount === 1) {
+    advisories.push("Single-domain mode is active. Select additional domains for portfolio comparability.");
+  }
+  if (!nonCloudInScope) {
+    advisories.push("Only Cloud is in scope. Add non-cloud domains for broader FinOps 2026 alignment.");
+  }
+  if (selectedCount > 0 && providedInScopeCount < selectedCount) {
+    const missing = inScopeRows.filter((row) => !row.provided).map((row) => row.label);
+    warnings.push(`Selected scope missing costs for: ${missing.join(", ")}.`);
+  }
+
+  return {
+    rows,
+    selectedDomains,
+    selectedCount,
+    providedInScopeCount,
+    totalTrackedDomains,
+    schemaCoveragePct,
+    coveragePct,
+    totalMonthly,
+    normalizedTotal,
+    confidence,
+    warnings,
+    advisories,
+    formula: "NTC/client = sum(alpha_d * C_d) / n",
+    weightingPolicy: {
+      recommendedMode: "financial-truth",
+      financialTruthRule: "alpha_d = 1 if selected in scope, else 0",
+      optionalPriorityIndexRule: "sum(w_d) = 1",
+      bands: PRIORITY_WEIGHT_BANDS,
+      balancedDefaultProfile: BALANCED_PRIORITY_PROFILE
+    }
+  };
+}
+
 export function deriveModel(inputs) {
   const model = { ...MODEL_DEFAULTS };
   let effectiveARPU = null;
@@ -225,7 +348,13 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
     infraTotal,
     ARPU: arpuInput,
     startupTargetPrice,
-    startupTargetClients
+    startupTargetClients,
+    techDomains,
+    costSaaS,
+    costLicensing,
+    costPrivateCloud,
+    costDataCenter,
+    costLabor
   } = inputs;
 
   const nSample = isFiniteNumber(nRef) && nRef > 0 ? nRef : DEFAULT_N_REF;
@@ -263,6 +392,16 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
   const reqClientsFromClientsMode = (arpuMode === "startup-clients" && isFiniteNumber(requiredPriceAtTargetClients))
     ? findRequiredClientsForTargetPrice(requiredPriceAtTargetClients, searchMax, model)
     : null;
+  const normalization = buildNormalizationSnapshot({
+    nRef,
+    infraTotal,
+    techDomains,
+    costSaaS,
+    costLicensing,
+    costPrivateCloud,
+    costDataCenter,
+    costLabor
+  });
 
   const series = buildData(model);
   const bePoint = series.find((d) => d.revenue >= d.total) || null;
@@ -299,7 +438,23 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
     cudMonthlySaving,
     requiredClientsAtTargetPrice,
     requiredPriceAtTargetClients,
-    targetMonthlyRevenue
+    targetMonthlyRevenue,
+    normalization: {
+      selectedDomains: normalization.selectedDomains,
+      selectedCount: normalization.selectedCount,
+      providedInScopeCount: normalization.providedInScopeCount,
+      totalTrackedDomains: normalization.totalTrackedDomains,
+      schemaCoveragePct: normalization.schemaCoveragePct,
+      coveragePct: normalization.coveragePct,
+      totalMonthly: normalization.totalMonthly,
+      normalizedTechCostPerClient: normalization.normalizedTotal,
+      confidence: normalization.confidence,
+      warnings: normalization.warnings,
+      advisories: normalization.advisories,
+      formula: normalization.formula,
+      weightingPolicy: normalization.weightingPolicy,
+      domainRows: normalization.rows
+    }
   };
 }
 
@@ -452,7 +607,12 @@ export function encodeStateTool(args = {}) {
     ? args.state
     : {
       v: SHARE_STATE_VERSION,
-      i: args.inputs && typeof args.inputs === "object" ? args.inputs : {},
+      i: args.inputs && typeof args.inputs === "object"
+        ? Object.fromEntries(Object.entries(args.inputs).filter(([key]) => key !== "techDomains"))
+        : {},
+      td: args.inputs && typeof args.inputs === "object"
+        ? normalizeTechDomains(args.inputs.techDomains)
+        : [...DEFAULT_TECH_DOMAINS],
       p: normalizeProviders(args.providers),
       h: normalizeHiddenCurves(args.hiddenCurves)
     };
@@ -494,15 +654,16 @@ export function calculateTool(args = {}) {
 
   const serializedInputs = {};
   Object.keys(inputs).forEach((key) => {
-    if (inputs[key] !== null && inputs[key] !== undefined) {
-      serializedInputs[key] = String(inputs[key]);
-    }
+    if (key === "techDomains") return;
+    if (inputs[key] === null || inputs[key] === undefined) return;
+    serializedInputs[key] = String(inputs[key]);
   });
 
   const stateToken = options.includeStateToken
     ? encodeShareState({
       v: SHARE_STATE_VERSION,
       i: serializedInputs,
+      td: inputs.techDomains,
       p: providers,
       h: hiddenCurves
     })
@@ -514,7 +675,7 @@ export function calculateTool(args = {}) {
     meta: {
       effectiveARPU: derived.effectiveARPU,
       arpuMode: derived.arpuMode,
-      warnings: []
+      warnings: outputs.normalization.warnings
     },
     outputs,
     health,
@@ -545,7 +706,17 @@ export const INPUT_SCHEMA_CALCULATE = {
         startupTargetClients: { type: ["number", "null"], minimum: 1 },
         cudPct: { type: ["number", "null"], minimum: 0, maximum: 95 },
         margin: { type: ["number", "null"], minimum: 0, maximum: 200 },
-        nMax: { type: ["number", "null"], minimum: 10, maximum: 100000 }
+        nMax: { type: ["number", "null"], minimum: 10, maximum: 100000 },
+        techDomains: {
+          type: "array",
+          items: { type: "string", enum: VALID_TECH_DOMAIN_KEYS },
+          uniqueItems: true
+        },
+        costSaaS: { type: ["number", "null"], minimum: 0 },
+        costLicensing: { type: ["number", "null"], minimum: 0 },
+        costPrivateCloud: { type: ["number", "null"], minimum: 0 },
+        costDataCenter: { type: ["number", "null"], minimum: 0 },
+        costLabor: { type: ["number", "null"], minimum: 0 }
       }
     },
     providers: {
