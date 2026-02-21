@@ -40,6 +40,14 @@ const BALANCED_PRIORITY_PROFILE = Object.freeze({
   "data-center": 0.08,
   labor: 0.12
 });
+const RECOMMENDATION_CATEGORIES = Object.freeze([
+  "all",
+  "infrastructure",
+  "pricing",
+  "marketing",
+  "crm",
+  "governance"
+]);
 
 const RECOMMENDATIONS = Object.freeze([
   { title: "You are below break-even", desc: "Current client volume is below the minimum viable threshold; fixed and variable costs are not yet recovered.", action: "Review pricing page and sales funnel conversion. Prioritize moving n above N_min within the next planning cycle.", providers: [], zones: ["red"], priority: "high" },
@@ -553,25 +561,143 @@ function priorityWeight(priority) {
   return 2;
 }
 
-export function recommendTool(args = {}) {
-  const zoneKey = typeof args.zoneKey === "string" ? args.zoneKey : "awaiting";
-  const providers = normalizeProviders(args.providers);
+function normalizeRecommendationCategory(category) {
+  if (typeof category !== "string") return "all";
+  return RECOMMENDATION_CATEGORIES.includes(category) ? category : "all";
+}
 
-  if (!["green", "yellow", "red"].includes(zoneKey)) {
-    return { recommendations: [] };
+function inferRecommendationCategory(rec) {
+  if (rec && typeof rec.category === "string") {
+    const explicit = normalizeRecommendationCategory(rec.category);
+    return explicit === "all" ? "infrastructure" : explicit;
   }
 
-  const recommendations = RECOMMENDATIONS
+  const haystack = `${rec?.title || ""} ${rec?.desc || ""} ${rec?.action || ""}`.toLowerCase();
+
+  if (/(crm|churn|renewal|upsell|cross-sell|retention)/.test(haystack)) return "crm";
+  if (/(pricing|price floor|arpu|package|fee increase|realized price)/.test(haystack)) return "pricing";
+  if (/(marketing|funnel|mql|sql|cac|demand generation|acquisition|sales motion)/.test(haystack)) return "marketing";
+  if (/(tagging|forecast|budget|anomaly|governance|allocation|guardrail|policy)/.test(haystack)) return "governance";
+  return "infrastructure";
+}
+
+function buildStrategicRecommendations({ zoneKey, nSample, beN, arpuUsed, minCostN, minCostPerClient }) {
+  if (!["green", "yellow", "red"].includes(zoneKey)) return [];
+  if (!isFiniteNumber(arpuUsed)) return [];
+
+  const strategic = [];
+  const minCostGap = Math.max(0, minCostPerClient - arpuUsed);
+  const upliftPct = arpuUsed > 0 ? (minCostGap / arpuUsed) * 100 : 0;
+
+  if (beN === null && minCostGap > 0) {
+    strategic.push({
+      title: "Raise realized ARPU above cost floor",
+      desc: `Current ARPU (${arpuUsed.toFixed(2)} per client) is below the model floor (${minCostPerClient.toFixed(2)} per client near n~${minCostN}).`,
+      action: `Improve realized price by at least ${minCostGap.toFixed(2)} per client (${upliftPct.toFixed(1)}%) via packaging tiers, add-ons, annual commitment discounts, or selective fee increases.`,
+      category: "pricing",
+      providers: [],
+      zones: [zoneKey],
+      priority: "high"
+    });
+    strategic.push({
+      title: "Marketing + funnel acceleration toward efficient scale",
+      desc: `Client volume still matters: unit cost bottoms near n~${minCostN}. Demand generation should align with this operating band.`,
+      action: "Run a 90-day growth motion (paid + partner + referral), improve MQL->SQL->Win conversion in CRM, and review CAC payback against the ARPU gap weekly.",
+      category: "marketing",
+      providers: [],
+      zones: [zoneKey],
+      priority: "medium"
+    });
+    strategic.push({
+      title: "CRM retention and expansion revenue playbook",
+      desc: "When cost cuts are near limit, expansion and retention become the fastest margin levers.",
+      action: `Launch upsell/cross-sell journeys, renewal controls, and churn-prevention triggers to add at least ${minCostGap.toFixed(2)} per client in net revenue over the next cycle.`,
+      category: "crm",
+      providers: [],
+      zones: [zoneKey],
+      priority: "high"
+    });
+    return strategic;
+  }
+
+  if (isFiniteNumber(beN) && nSample < beN) {
+    const gapClients = Math.max(1, Math.round(beN - nSample));
+    strategic.push({
+      title: "Close break-even client gap with GTM execution",
+      desc: `You are ${gapClients} clients below break-even volume (${beN}).`,
+      action: "Prioritize pipeline quality, onboarding speed, and CRM conversion stages to move qualified demand into paying clients faster while protecting margin.",
+      category: "marketing",
+      providers: [],
+      zones: [zoneKey],
+      priority: "high"
+    });
+  }
+
+  return strategic;
+}
+
+function buildRecommendationContext(inputs, model, effectiveARPU) {
+  if (!inputs || !model) return null;
+
+  const nSample = isFiniteNumber(inputs.nRef) && inputs.nRef > 0 ? inputs.nRef : DEFAULT_N_REF;
+  const arpuUsed = (isFiniteNumber(effectiveARPU) && effectiveARPU > 0)
+    ? effectiveARPU
+    : (isFiniteNumber(inputs.ARPU) && inputs.ARPU > 0 ? inputs.ARPU : null);
+
+  const series = buildData(model);
+  const be = series.find((d) => d.revenue >= d.total);
+  const beN = be ? Math.round(be.n) : null;
+  const minCostPoint = series.reduce((minPt, point) => (point.total < minPt.total ? point : minPt), series[0]);
+
+  return {
+    nSample,
+    arpuUsed,
+    beN,
+    minCostN: Math.max(1, Math.round(minCostPoint.n)),
+    minCostPerClient: minCostPoint.total
+  };
+}
+
+function buildPrioritizedRecommendations({ zoneKey, providers, category, inputs, model, effectiveARPU }) {
+  if (!["green", "yellow", "red"].includes(zoneKey)) return [];
+
+  const categoryKey = normalizeRecommendationCategory(category);
+  const context = buildRecommendationContext(inputs, model, effectiveARPU);
+  const strategicRecommendations = context
+    ? buildStrategicRecommendations({ zoneKey, ...context })
+    : [];
+
+  return [...strategicRecommendations, ...RECOMMENDATIONS]
+    .map((rec) => ({ ...rec, category: inferRecommendationCategory(rec) }))
     .filter((rec) => rec.zones.includes(zoneKey))
     .filter((rec) => rec.providers.length === 0 || providers.some((provider) => rec.providers.includes(provider)))
+    .filter((rec) => categoryKey === "all" || rec.category === categoryKey)
     .sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority))
     .map((rec) => ({
       title: rec.title,
       priority: rec.priority,
       providers: rec.providers,
+      category: rec.category,
       desc: rec.desc,
       action: rec.action
     }));
+}
+
+export function recommendTool(args = {}) {
+  const zoneKey = typeof args.zoneKey === "string" ? args.zoneKey : "awaiting";
+  const providers = normalizeProviders(args.providers);
+  const category = normalizeRecommendationCategory(args.category);
+  const normalizedInputs = args.inputs && typeof args.inputs === "object" ? normalizeInputs(args.inputs) : null;
+  const derived = normalizedInputs ? deriveModel(normalizedInputs) : null;
+
+  const recommendations = buildPrioritizedRecommendations({
+    zoneKey,
+    providers,
+    category,
+    inputs: normalizedInputs,
+    model: derived ? derived.model : null,
+    effectiveARPU: derived ? derived.effectiveARPU : null
+  });
 
   return { recommendations };
 }
@@ -649,7 +775,14 @@ export function calculateTool(args = {}) {
     : null;
 
   const recommendations = options.includeRecommendations
-    ? recommendTool({ zoneKey: health ? health.zoneKey : "awaiting", providers }).recommendations
+    ? buildPrioritizedRecommendations({
+      zoneKey: health ? health.zoneKey : "awaiting",
+      providers,
+      category: "all",
+      inputs,
+      model: derived.model,
+      effectiveARPU: derived.effectiveARPU
+    })
     : [];
 
   const serializedInputs = {};
@@ -757,7 +890,9 @@ export const INPUT_SCHEMA_RECOMMEND = {
   additionalProperties: false,
   properties: {
     zoneKey: { type: "string", enum: ["green", "yellow", "red", "awaiting"] },
-    providers: { type: "array", items: { type: "string", enum: PROVIDERS }, uniqueItems: true }
+    providers: { type: "array", items: { type: "string", enum: PROVIDERS }, uniqueItems: true },
+    category: { type: "string", enum: RECOMMENDATION_CATEGORIES },
+    inputs: INPUT_SCHEMA_CALCULATE.properties.inputs
   },
   required: ["zoneKey"]
 };

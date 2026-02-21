@@ -78,6 +78,30 @@ async function runContractTests() {
 
   const recs = recommendTool({ zoneKey: "yellow", providers: ["aws"] });
   assert.ok(Array.isArray(recs.recommendations), "recommendation output should be array");
+  assert.ok(
+    recs.recommendations.every((rec) => typeof rec.category === "string"),
+    "recommendations should include category field"
+  );
+
+  const categoryFiltered = recommendTool({
+    zoneKey: "yellow",
+    category: "pricing",
+    providers: ["aws"],
+    inputs: {
+      nRef: 120,
+      devPerClient: 500,
+      infraTotal: 2400,
+      startupTargetPrice: 35
+    }
+  });
+  assert.ok(
+    categoryFiltered.recommendations.every((rec) => rec.category === "pricing"),
+    "category filter should scope recommendation output"
+  );
+  assert.ok(
+    categoryFiltered.recommendations.some((rec) => rec.title === "Raise realized ARPU above cost floor"),
+    "strategic no-break-even pricing recommendation should be present"
+  );
 
   const encoded = encodeStateTool({
     inputs: {
@@ -227,6 +251,10 @@ async function runProtocolTests() {
       "tools/call should return scoped selected domains"
     );
     assert.ok(Array.isArray(payload.recommendations), "tools/call recommendations should be array");
+    assert.ok(
+      payload.recommendations.every((rec) => typeof rec.category === "string"),
+      "tools/call recommendations should include category"
+    );
 
     let unknownToolError = null;
     try {

@@ -31,7 +31,7 @@ const tools = [
   },
   {
     name: "finops.recommend",
-    description: "Return prioritized recommendations based on health zone and selected providers.",
+    description: "Return prioritized recommendations based on health zone, provider, and optional category filter; when inputs are provided, strategic pricing/marketing/CRM recommendations are included.",
     inputSchema: INPUT_SCHEMA_RECOMMEND,
     handler: recommendTool
   },

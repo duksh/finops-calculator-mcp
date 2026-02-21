@@ -133,10 +133,11 @@
             "type": "array",
             "items": { "type": "string" }
           },
+          "category": { "type": "string", "enum": ["infrastructure", "pricing", "marketing", "crm", "governance"] },
           "desc": { "type": "string" },
           "action": { "type": "string" }
         },
-        "required": ["title", "priority", "providers", "desc", "action"]
+        "required": ["title", "priority", "providers", "category", "desc", "action"]
       }
     },
     "stateToken": { "type": ["string", "null"] }

@@ -101,6 +101,7 @@
       "title": "CCER below 3x",
       "priority": "high",
       "providers": [],
+      "category": "governance",
       "desc": "Cloud Cost Efficiency Ratio is below FinOps benchmark. Revenue generated per euro of cloud spend is under target.",
       "action": "Isolate top cost drivers and enforce unit economics guardrails per service."
     }
