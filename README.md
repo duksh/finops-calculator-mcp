@@ -1,6 +1,24 @@
 # MCP Workspace
 
-This folder is dedicated to all Model Context Protocol (MCP) related work for the FinOps calculator.
+Official product name: **FiceCal**.
+
+Former descriptive name: FinOps and Cloud Economics Calculator.
+
+This folder is dedicated to all Model Context Protocol (MCP) related work for FiceCal.
+
+## Release 2 bundle (today)
+
+Release 2 for MCP focuses on parity and model integrity with the FiceCal calculator:
+
+- Deterministic economic scan (`scanEconomicRange`) for break-even and minimum unit-cost detection
+- Unified cost helper (`totalCostAtClients`) reused across pricing and health calculations
+- Break-even and recommendation context aligned to integer-range economics scan (not sampled chart points)
+- Zero-infra CCER handling aligned to `Infinity` semantics with finite-only penalty scoring
+- Zero-value cost input paths (`devPerClient=0`, `infraTotal=0`) normalized consistently in model derivation
+- Cross-repo parity test validated against calculator source (`npm run test:parity`)
+- Package version bumped to `0.2.0`
+
+---
 
 ## Current contents
 
