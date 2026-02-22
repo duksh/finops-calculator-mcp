@@ -4,17 +4,16 @@
 # Required
 version: 2
 
-# Set the OS, Python version, and other tools you might need
+# Set the OS for the build environment
 build:
   os: ubuntu-24.04
-  tools:
-    nodejs: "22"
 
   commands:
-    # Install Docusaurus dependencies
-    - cd docs/ && npm install
-    # Build the site
-    - cd docs/ && npm run build
-    # Copy generated files into Read the Docs directory
+    # Publish existing MCP documentation assets
     - mkdir --parents $READTHEDOCS_OUTPUT/html/
-    - cp --recursive docs/build/* $READTHEDOCS_OUTPUT/html/
+    - cp README.md $READTHEDOCS_OUTPUT/html/README.md
+    - cp spec.md $READTHEDOCS_OUTPUT/html/spec.md
+    - cp client-config-examples.md $READTHEDOCS_OUTPUT/html/client-config-examples.md
+    - mkdir --parents $READTHEDOCS_OUTPUT/html/docs/releases/
+    - cp docs/releases/release-2.md $READTHEDOCS_OUTPUT/html/docs/releases/release-2.md
+    - printf '%s\n' '<!doctype html>' '<html lang="en">' '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>FiceCal MCP Docs</title></head>' '<body><h1>FiceCal MCP Docs</h1><ul><li><a href="README.md">README</a></li><li><a href="spec.md">MCP Spec</a></li><li><a href="client-config-examples.md">Client Config Examples</a></li><li><a href="docs/releases/release-2.md">Release 2 Notes</a></li></ul></body></html>' > $READTHEDOCS_OUTPUT/html/index.html
