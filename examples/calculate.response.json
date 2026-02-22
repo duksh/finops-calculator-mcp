@@ -86,11 +86,10 @@
     }
   },
   "health": {
-    "zoneKey": "yellow",
-    "zoneTitle": "Yellow Zone - Needs Improvement",
-    "score": 45,
+    "zoneKey": "green",
+    "zoneTitle": "Green Zone - Healthy Economics",
+    "score": 80,
     "failedChecks": [
-      "No break-even point exists within the current model range.",
       "CCER is 1.75x (below 3x benchmark).",
       "Commitment saving gap is 45.2% of infra spend.",
       "Planning mode: ARPU estimated from target price assumption."

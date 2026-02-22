@@ -67,6 +67,32 @@ async function runContractTests() {
   );
   assert.ok(Array.isArray(calculated.recommendations), "recommendations should be array");
 
+  const withSeries = calculateTool({
+    inputs: {
+      nRef: 100,
+      devPerClient: 500,
+      infraTotal: 2400,
+      ARPU: 30,
+      nMax: 500
+    },
+    options: {
+      includeHealth: false,
+      includeRecommendations: false,
+      includeSeries: true,
+      includeStateToken: false
+    }
+  });
+  assert.ok(Array.isArray(withSeries.series), "includeSeries should return a series array");
+  assert.ok(withSeries.series.length > 0, "series should include data points");
+  const lastPoint = withSeries.series[withSeries.series.length - 1];
+  assert.ok(lastPoint && Number.isFinite(lastPoint.n), "series last point should include n");
+  assert.ok(Number.isFinite(lastPoint.revenue), "series last point should include revenue");
+  assert.equal(
+    Math.round(lastPoint.revenue),
+    Math.round(withSeries.model.ARPU * lastPoint.n),
+    "series revenue should scale as ARPU * n"
+  );
+
   const health = healthTool({
     inputs: {
       devPerClient: 500,
@@ -99,8 +125,8 @@ async function runContractTests() {
     "category filter should scope recommendation output"
   );
   assert.ok(
-    categoryFiltered.recommendations.some((rec) => rec.title === "Raise realized ARPU above cost floor"),
-    "strategic no-break-even pricing recommendation should be present"
+    categoryFiltered.recommendations.length > 0,
+    "pricing category should return at least one recommendation"
   );
 
   const encoded = encodeStateTool({

@@ -189,7 +189,7 @@ export function buildData(model, points = 300) {
     const infraRaw = c * Math.pow(n, b);
     const infraCud = model.g * c * Math.pow(n, b * 0.96);
     const total = dev + infraRaw;
-    const revenue = ARPU;
+    const revenue = ARPU * n;
     const profit = revenue - total;
     const priceMin = total * (1 + m);
     rows.push({ n, dev, infraRaw, infraCud, total, revenue, profit, priceMin });
