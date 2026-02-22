@@ -197,9 +197,42 @@ export function buildData(model, points = 300) {
   return rows;
 }
 
+export function totalCostAtClients(n, model) {
+  const safeN = Math.max(1, n);
+  return model.K * Math.pow(safeN, -model.a) + model.c * Math.pow(safeN, model.b);
+}
+
+export function scanEconomicRange(arpu, maxN, model) {
+  const limit = Math.max(1, Math.round(maxN));
+  const hasArpu = isFiniteNumber(arpu) && arpu > 0;
+  let breakEvenN = null;
+  let minUnitCost = Infinity;
+  let minUnitCostN = 1;
+
+  for (let n = 1; n <= limit; n += 1) {
+    const total = totalCostAtClients(n, model);
+    const unitCost = total / n;
+
+    if (unitCost < minUnitCost) {
+      minUnitCost = unitCost;
+      minUnitCostN = n;
+    }
+
+    if (hasArpu && breakEvenN === null && (arpu * n) >= total) {
+      breakEvenN = n;
+    }
+  }
+
+  return {
+    breakEvenN,
+    minUnitCostN,
+    minUnitCostPerClient: Number.isFinite(minUnitCost) ? minUnitCost : null
+  };
+}
+
 export function minPriceAtClients(n, model) {
   const safeN = Math.max(1, n);
-  const total = model.K * Math.pow(safeN, -model.a) + model.c * Math.pow(safeN, model.b);
+  const total = totalCostAtClients(safeN, model);
   return (total / safeN) * (1 + model.m);
 }
 
@@ -315,13 +348,13 @@ export function deriveModel(inputs) {
     derivations.push(`g=${model.g.toFixed(2)}`);
   }
 
-  if (isFiniteNumber(devPerClient) && devPerClient > 0) {
+  if (isFiniteNumber(devPerClient) && devPerClient >= 0) {
     const n = isFiniteNumber(nRef) && nRef > 0 ? nRef : DEFAULT_N_REF;
     model.K = devPerClient * Math.pow(n, model.a);
     derivations.push(`K=${model.K.toFixed(0)}`);
   }
 
-  if (isFiniteNumber(infraTotal) && infraTotal > 0) {
+  if (isFiniteNumber(infraTotal) && infraTotal >= 0) {
     const n = isFiniteNumber(nRef) && nRef > 0 ? nRef : DEFAULT_N_REF;
     model.c = infraTotal / Math.pow(n, model.b);
     derivations.push(`c=${model.c.toFixed(4)}@n=${n}`);
@@ -338,7 +371,7 @@ export function deriveModel(inputs) {
     derivations.push(`ARPU~${model.ARPU.toFixed(2)}(startup-price)`);
   } else if (
     isFiniteNumber(startupTargetClients) && startupTargetClients > 0 &&
-    ((isFiniteNumber(devPerClient) && devPerClient > 0) || (isFiniteNumber(infraTotal) && infraTotal > 0))
+    ((isFiniteNumber(devPerClient) && devPerClient >= 0) || (isFiniteNumber(infraTotal) && infraTotal >= 0))
   ) {
     model.ARPU = minPriceAtClients(startupTargetClients, model);
     effectiveARPU = model.ARPU;
@@ -385,10 +418,11 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
   const vcpu = infraRaw / nSample;
   const contributionMargin = hasARPU ? arpuUsed - vcpu : null;
   const minPricePerClient = (total / nSample) * (1 + model.m);
-  const ccer = hasInfra && hasARPU && infraRaw > 0 ? revenue / infraRaw : null;
+  const ccer = hasInfra && hasARPU ? (infraRaw > 0 ? (revenue / infraRaw) : Number.POSITIVE_INFINITY) : null;
   const cudMonthlySaving = hasInfra ? infraRaw - infraCud : null;
 
   const searchMax = Math.max(20000, model.nMax);
+  const economics = scanEconomicRange(arpuUsed, searchMax, model);
   const requiredClientsAtTargetPrice = (hasStartupPrice && hasAnyCostInput)
     ? findRequiredClientsForTargetPrice(startupTargetPrice, searchMax, model)
     : null;
@@ -411,9 +445,7 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
     costLabor
   });
 
-  const series = buildData(model);
-  const bePoint = series.find((d) => d.revenue >= d.total) || null;
-  const beN = bePoint ? Math.round(bePoint.n) : null;
+  const beN = economics.breakEvenN;
 
   let breakEvenClients = null;
   const beNeedsArpu = !hasARPU;
@@ -492,12 +524,11 @@ export function computeHealth(inputs, model, effectiveARPU, arpuMode) {
   const revenue = arpuUsed * nSample;
   const vcpu = infraRaw / nSample;
   const contributionMargin = arpuUsed - vcpu;
-  const ccer = infraRaw > 0 ? revenue / infraRaw : 0;
+  const ccer = infraRaw > 0 ? (revenue / infraRaw) : Number.POSITIVE_INFINITY;
   const cudSaveGapPct = infraRaw > 0 ? ((infraRaw - infraCud) / infraRaw) : 0;
 
-  const series = buildData(model);
-  const be = series.find((d) => d.revenue >= d.total);
-  const beN = be ? Math.round(be.n) : null;
+  const economics = scanEconomicRange(arpuUsed, Math.max(20000, model.nMax), model);
+  const beN = economics.breakEvenN;
 
   let score = 100;
   const failed = [];
@@ -510,10 +541,10 @@ export function computeHealth(inputs, model, effectiveARPU, arpuMode) {
     failed.push(`Current clients (${Math.round(nSample)}) are below break-even (${beN}).`);
   }
 
-  if (ccer < 1) {
+  if (Number.isFinite(ccer) && ccer < 1) {
     score -= 30;
     failed.push(`CCER is ${ccer.toFixed(2)}x (<1x).`);
-  } else if (ccer < 3) {
+  } else if (Number.isFinite(ccer) && ccer < 3) {
     score -= 15;
     failed.push(`CCER is ${ccer.toFixed(2)}x (below 3x benchmark).`);
   }
@@ -644,17 +675,14 @@ function buildRecommendationContext(inputs, model, effectiveARPU) {
     ? effectiveARPU
     : (isFiniteNumber(inputs.ARPU) && inputs.ARPU > 0 ? inputs.ARPU : null);
 
-  const series = buildData(model);
-  const be = series.find((d) => d.revenue >= d.total);
-  const beN = be ? Math.round(be.n) : null;
-  const minCostPoint = series.reduce((minPt, point) => (point.total < minPt.total ? point : minPt), series[0]);
+  const economics = scanEconomicRange(arpuUsed, Math.max(20000, model.nMax), model);
 
   return {
     nSample,
     arpuUsed,
-    beN,
-    minCostN: Math.max(1, Math.round(minCostPoint.n)),
-    minCostPerClient: minCostPoint.total
+    beN: economics.breakEvenN,
+    minCostN: economics.minUnitCostN,
+    minCostPerClient: economics.minUnitCostPerClient
   };
 }
 
