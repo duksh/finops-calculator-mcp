@@ -12,7 +12,10 @@ const EXPECTED_MODEL_DEFAULTS = Object.freeze({
   m: 0.15,
   nMax: 1000
 });
+const EXPECTED_SHARE_STATE_VERSION = 1;
 const EXPECTED_DOMAINS = Object.freeze(["cloud", "saas", "licensing", "private-cloud", "data-center", "labor"]);
+const EXPECTED_UI_MODES = Object.freeze(["quick", "operator", "architect"]);
+const EXPECTED_UI_INTENTS = Object.freeze(["viability", "operations", "architecture", "executive"]);
 const REQUIRED_INPUT_IDS = Object.freeze([
   "inp-techDomains",
   "inp-costSaaS",
@@ -70,6 +73,25 @@ function parseDomainKeys(html) {
   return Array.from(new Set(matches));
 }
 
+function parseNumericConstant(html, constantName) {
+  const escaped = constantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = html.match(new RegExp(`const ${escaped} = (\\d+);`));
+  assert.ok(match, `Unable to locate ${constantName} in calculator index.html`);
+  return Number(match[1]);
+}
+
+function parseStringArrayConstant(html, constantName) {
+  const escaped = constantName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = html.match(new RegExp(`const ${escaped} = \\[(.*?)\\];`));
+  assert.ok(match, `Unable to locate ${constantName} in calculator index.html`);
+
+  return match[1]
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => entry.replace(/^['\"]|['\"]$/g, ""));
+}
+
 export async function runCrossRepoParityGuard(rawUrl = process.env.FINOPS_CALCULATOR_RAW_URL || DEFAULT_RAW_URL) {
   const html = await fetchText(rawUrl);
 
@@ -84,6 +106,15 @@ export async function runCrossRepoParityGuard(rawUrl = process.env.FINOPS_CALCUL
 
   const domainKeys = parseDomainKeys(html);
   assert.deepEqual(domainKeys, [...EXPECTED_DOMAINS], "Technology domains drift detected between calculator UI and MCP");
+
+  const shareStateVersion = parseNumericConstant(html, "SHARE_STATE_VERSION");
+  assert.equal(shareStateVersion, EXPECTED_SHARE_STATE_VERSION, "Share-state version drift detected");
+
+  const uiModes = parseStringArrayConstant(html, "UI_MODE_OPTIONS");
+  assert.deepEqual(uiModes, [...EXPECTED_UI_MODES], "UI mode options drift detected between calculator UI and MCP");
+
+  const uiIntents = parseStringArrayConstant(html, "UI_INTENT_OPTIONS");
+  assert.deepEqual(uiIntents, [...EXPECTED_UI_INTENTS], "UI intent options drift detected between calculator UI and MCP");
 
   assert.ok(
     html.includes("Multi-Domain Normalized Tech Cost"),

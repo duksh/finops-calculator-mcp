@@ -6,17 +6,21 @@ Former descriptive name: FinOps and Cloud Economics Calculator.
 
 This folder is dedicated to all Model Context Protocol (MCP) related work for FiceCal.
 
-## Release 2 bundle (today)
+## Release 3 bundle (today)
 
-Release 2 for MCP focuses on parity and model integrity with the FiceCal calculator:
+Release 3 for MCP focuses on UI-aware state parity and first-timer flow compatibility with the FiceCal calculator:
 
 - Deterministic economic scan (`scanEconomicRange`) for break-even and minimum unit-cost detection
 - Unified cost helper (`totalCostAtClients`) reused across pricing and health calculations
 - Break-even and recommendation context aligned to integer-range economics scan (not sampled chart points)
 - Zero-infra CCER handling aligned to `Infinity` semantics with finite-only penalty scoring
 - Zero-value cost input paths (`devPerClient=0`, `infraTotal=0`) normalized consistently in model derivation
+- Share-state payload now includes normalized UI context (`ui` intent + `um` mode) for MCP-encoded tokens
+- `finops.calculate` now accepts optional `uiIntent` / `uiMode` so generated state tokens open in the same role/mode context
+- `finops.state.encode` schema now supports explicit UI context arguments
+- Cross-repo parity guard now validates `SHARE_STATE_VERSION`, `UI_MODE_OPTIONS`, and `UI_INTENT_OPTIONS` drift
 - Cross-repo parity test validated against calculator source (`npm run test:parity`)
-- Package version bumped to `0.2.0`
+- Package version bumped to `0.3.0`
 
 ---
 

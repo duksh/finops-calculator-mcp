@@ -13,7 +13,7 @@ import {
 
 const SERVER_INFO = {
   name: "finops-calculator-mcp",
-  version: "0.1.0"
+  version: "0.3.0"
 };
 
 const tools = [

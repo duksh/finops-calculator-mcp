@@ -136,6 +136,8 @@ async function runContractTests() {
       startupTargetPrice: 35,
       techDomains: ["cloud", "saas"]
     },
+    uiIntent: "operations",
+    uiMode: "operator",
     providers: ["aws"],
     hiddenCurves: ["profit"]
   });
@@ -144,6 +146,29 @@ async function runContractTests() {
   const decoded = decodeStateTool({ stateToken: encoded.stateToken });
   assert.equal(decoded.state.p[0], "aws", "decoded provider should match encoded state");
   assert.deepEqual(decoded.state.td, ["cloud", "saas"], "decoded domain scope should match encoded state");
+  assert.equal(decoded.state.ui, "operations", "decoded ui intent should match encoded context");
+  assert.equal(decoded.state.um, "operator", "decoded ui mode should match encoded context");
+
+  const calcWithStateContext = calculateTool({
+    inputs: {
+      devPerClient: 500,
+      infraTotal: 2400,
+      ARPU: 30
+    },
+    uiIntent: "executive",
+    uiMode: "operator",
+    providers: ["aws"],
+    options: {
+      includeHealth: true,
+      includeRecommendations: true,
+      includeSeries: false,
+      includeStateToken: true
+    }
+  });
+  assert.ok(typeof calcWithStateContext.stateToken === "string", "calculate should return a state token when enabled");
+  const decodedFromCalculate = decodeStateTool({ stateToken: calcWithStateContext.stateToken });
+  assert.equal(decodedFromCalculate.state.ui, "executive", "calculate state token should preserve ui intent");
+  assert.equal(decodedFromCalculate.state.um, "operator", "calculate state token should preserve ui mode");
 }
 
 function encodeRpcMessage(message) {

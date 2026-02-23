@@ -11,6 +11,10 @@ const MODEL_DEFAULTS = Object.freeze({
 
 const DEFAULT_N_REF = 100;
 const SHARE_STATE_VERSION = 1;
+const UI_MODE_OPTIONS = Object.freeze(["quick", "operator", "architect"]);
+const UI_INTENT_OPTIONS = Object.freeze(["viability", "operations", "architecture", "executive"]);
+const UI_MODE_DEFAULT = "quick";
+const UI_INTENT_DEFAULT = "viability";
 
 const PROVIDERS = Object.freeze(["aws", "azure", "gcp", "oci", "ibm", "alibaba", "huawei", "multi"]);
 const CURVE_KEYS = Object.freeze(["dev", "infra-raw", "infra-cud", "total", "revenue", "profit", "price-min"]);
@@ -146,6 +150,14 @@ export function normalizeProviders(providers) {
     out.push(provider);
   });
   return out;
+}
+
+function normalizeUiMode(value) {
+  return typeof value === "string" && UI_MODE_OPTIONS.includes(value) ? value : UI_MODE_DEFAULT;
+}
+
+function normalizeUiIntent(value) {
+  return typeof value === "string" && UI_INTENT_OPTIONS.includes(value) ? value : UI_INTENT_DEFAULT;
 }
 
 export function normalizeHiddenCurves(hiddenCurves) {
@@ -756,20 +768,44 @@ export function decodeShareState(token) {
   }
 }
 
+function buildSerializedInputState(inputs) {
+  if (!inputs || typeof inputs !== "object") return {};
+  const state = {};
+  Object.entries(inputs).forEach(([key, value]) => {
+    if (key === "techDomains") return;
+    if (value === null || value === undefined || value === "") return;
+    state[key] = String(value);
+  });
+  return state;
+}
+
+function normalizeShareStatePayload(payload = {}) {
+  const inputState = payload.i && typeof payload.i === "object"
+    ? payload.i
+    : (payload.inputs && typeof payload.inputs === "object" ? payload.inputs : {});
+
+  return {
+    v: SHARE_STATE_VERSION,
+    ui: normalizeUiIntent(payload.ui),
+    um: normalizeUiMode(payload.um),
+    i: buildSerializedInputState(inputState),
+    td: normalizeTechDomains(payload.td),
+    p: normalizeProviders(payload.p),
+    h: normalizeHiddenCurves(payload.h)
+  };
+}
+
 export function encodeStateTool(args = {}) {
   const state = args.state && typeof args.state === "object"
-    ? args.state
-    : {
-      v: SHARE_STATE_VERSION,
-      i: args.inputs && typeof args.inputs === "object"
-        ? Object.fromEntries(Object.entries(args.inputs).filter(([key]) => key !== "techDomains"))
-        : {},
-      td: args.inputs && typeof args.inputs === "object"
-        ? normalizeTechDomains(args.inputs.techDomains)
-        : [...DEFAULT_TECH_DOMAINS],
-      p: normalizeProviders(args.providers),
-      h: normalizeHiddenCurves(args.hiddenCurves)
-    };
+    ? normalizeShareStatePayload(args.state)
+    : normalizeShareStatePayload({
+      ui: args.uiIntent,
+      um: args.uiMode,
+      i: args.inputs && typeof args.inputs === "object" ? args.inputs : {},
+      td: args.inputs && typeof args.inputs === "object" ? args.inputs.techDomains : undefined,
+      p: args.providers,
+      h: args.hiddenCurves
+    });
 
   const stateToken = encodeShareState(state);
   if (!stateToken) throw new Error("Failed to encode state payload.");
@@ -813,21 +849,15 @@ export function calculateTool(args = {}) {
     })
     : [];
 
-  const serializedInputs = {};
-  Object.keys(inputs).forEach((key) => {
-    if (key === "techDomains") return;
-    if (inputs[key] === null || inputs[key] === undefined) return;
-    serializedInputs[key] = String(inputs[key]);
-  });
-
   const stateToken = options.includeStateToken
-    ? encodeShareState({
-      v: SHARE_STATE_VERSION,
-      i: serializedInputs,
+    ? encodeShareState(normalizeShareStatePayload({
+      ui: args.uiIntent,
+      um: args.uiMode,
+      i: buildSerializedInputState(inputs),
       td: inputs.techDomains,
       p: providers,
       h: hiddenCurves
-    })
+    }))
     : null;
 
   const result = {
@@ -890,6 +920,8 @@ export const INPUT_SCHEMA_CALCULATE = {
       items: { type: "string", enum: CURVE_KEYS },
       uniqueItems: true
     },
+    uiIntent: { type: "string", enum: UI_INTENT_OPTIONS },
+    uiMode: { type: "string", enum: UI_MODE_OPTIONS },
     options: {
       type: "object",
       additionalProperties: false,
@@ -932,7 +964,9 @@ export const INPUT_SCHEMA_STATE_ENCODE = {
     state: { type: "object" },
     inputs: INPUT_SCHEMA_CALCULATE.properties.inputs,
     providers: { type: "array", items: { type: "string", enum: PROVIDERS }, uniqueItems: true },
-    hiddenCurves: { type: "array", items: { type: "string", enum: CURVE_KEYS }, uniqueItems: true }
+    hiddenCurves: { type: "array", items: { type: "string", enum: CURVE_KEYS }, uniqueItems: true },
+    uiIntent: { type: "string", enum: UI_INTENT_OPTIONS },
+    uiMode: { type: "string", enum: UI_MODE_OPTIONS }
   }
 };
 
