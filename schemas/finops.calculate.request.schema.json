@@ -30,7 +30,26 @@
         "costLicensing": { "type": ["number", "null"], "minimum": 0 },
         "costPrivateCloud": { "type": ["number", "null"], "minimum": 0 },
         "costDataCenter": { "type": ["number", "null"], "minimum": 0 },
-        "costLabor": { "type": ["number", "null"], "minimum": 0 }
+        "costLabor": { "type": ["number", "null"], "minimum": 0 },
+        "reliabilityEnabled": {
+          "type": ["boolean", "string"],
+          "enum": [true, false, "on", "off"]
+        },
+        "sloTargetAvailabilityPct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "sliObservedAvailabilityPct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "incidentCountMonthly": { "type": ["number", "null"], "minimum": 0 },
+        "mttrHours": { "type": ["number", "null"], "minimum": 0 },
+        "incidentBlendedHourlyRate": { "type": ["number", "null"], "minimum": 0 },
+        "criticalRevenuePerMinute": { "type": ["number", "null"], "minimum": 0 },
+        "arrExposedMonthly": { "type": ["number", "null"], "minimum": 0 },
+        "slaPenaltyRatePerBreachPointMonthly": { "type": ["number", "null"], "minimum": 0 },
+        "reliabilityInvestmentMonthly": { "type": ["number", "null"], "minimum": 0 },
+        "minutesInMonth": { "type": ["number", "null"], "minimum": 1 },
+        "incidentFteCount": { "type": ["number", "null"], "minimum": 0 },
+        "criticalTrafficSharePct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "churnSensitivityPct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "breachProbabilityPct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "slaPenaltyMonthly": { "type": ["number", "null"], "minimum": 0 }
       }
     },
     "providers": {

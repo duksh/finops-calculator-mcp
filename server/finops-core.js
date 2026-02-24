@@ -9,6 +9,7 @@ const MODEL_DEFAULTS = Object.freeze({
   nMax: 1000
 });
 
+const DEFAULT_MINUTES_IN_MONTH = 30 * 24 * 60;
 const DEFAULT_N_REF = 100;
 const SHARE_STATE_VERSION = 1;
 const UI_MODE_OPTIONS = Object.freeze(["quick", "operator", "architect"]);
@@ -104,6 +105,27 @@ function normalizeNumber(value, config = {}) {
   return normalized;
 }
 
+function normalizeToggle(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value !== "string") return false;
+  const lowered = value.trim().toLowerCase();
+  return lowered === "on" || lowered === "true" || lowered === "1";
+}
+
+function clampPercent(value, fallback = 0) {
+  const n = toNumber(value);
+  const base = isFiniteNumber(n) ? n : fallback;
+  return Math.max(0, Math.min(100, base));
+}
+
+function countProvided(values) {
+  return values.reduce((count, value) => {
+    if (value === null || value === undefined || value === "") return count;
+    return isFiniteNumber(toNumber(value)) ? count + 1 : count;
+  }, 0);
+}
+
 function normalizeTechDomains(value) {
   if (!Array.isArray(value)) return [...DEFAULT_TECH_DOMAINS];
   const deduped = [];
@@ -134,7 +156,23 @@ export function normalizeInputs(inputs = {}) {
     costLicensing: normalizeNumber(inputs.costLicensing, { min: 0 }),
     costPrivateCloud: normalizeNumber(inputs.costPrivateCloud, { min: 0 }),
     costDataCenter: normalizeNumber(inputs.costDataCenter, { min: 0 }),
-    costLabor: normalizeNumber(inputs.costLabor, { min: 0 })
+    costLabor: normalizeNumber(inputs.costLabor, { min: 0 }),
+    reliabilityEnabled: normalizeToggle(inputs.reliabilityEnabled),
+    sloTargetAvailabilityPct: normalizeNumber(inputs.sloTargetAvailabilityPct, { min: 0, max: 100 }),
+    sliObservedAvailabilityPct: normalizeNumber(inputs.sliObservedAvailabilityPct, { min: 0, max: 100 }),
+    incidentCountMonthly: normalizeNumber(inputs.incidentCountMonthly, { min: 0, integer: true }),
+    mttrHours: normalizeNumber(inputs.mttrHours, { min: 0 }),
+    incidentBlendedHourlyRate: normalizeNumber(inputs.incidentBlendedHourlyRate, { min: 0 }),
+    criticalRevenuePerMinute: normalizeNumber(inputs.criticalRevenuePerMinute, { min: 0 }),
+    arrExposedMonthly: normalizeNumber(inputs.arrExposedMonthly, { min: 0 }),
+    slaPenaltyRatePerBreachPointMonthly: normalizeNumber(inputs.slaPenaltyRatePerBreachPointMonthly, { min: 0 }),
+    reliabilityInvestmentMonthly: normalizeNumber(inputs.reliabilityInvestmentMonthly, { min: 0 }),
+    minutesInMonth: normalizeNumber(inputs.minutesInMonth, { min: 1, integer: true }),
+    incidentFteCount: normalizeNumber(inputs.incidentFteCount, { min: 0 }),
+    criticalTrafficSharePct: normalizeNumber(inputs.criticalTrafficSharePct, { min: 0, max: 100 }),
+    churnSensitivityPct: normalizeNumber(inputs.churnSensitivityPct, { min: 0, max: 100 }),
+    breachProbabilityPct: normalizeNumber(inputs.breachProbabilityPct, { min: 0, max: 100 }),
+    slaPenaltyMonthly: normalizeNumber(inputs.slaPenaltyMonthly, { min: 0 })
   };
 }
 
@@ -394,6 +432,110 @@ export function deriveModel(inputs) {
   return { model, effectiveARPU, arpuMode, derivations };
 }
 
+function computeReliabilityMetrics(inputs, existingModeledCostMonthly) {
+  const enabled = Boolean(inputs && inputs.reliabilityEnabled);
+  if (!enabled) {
+    return {
+      enabled: false,
+      expectedDowntimeMinutes: null,
+      expectedSlaPenaltyMonthly: null,
+      expectedIncidentLaborMonthly: null,
+      expectedRevenueAtRiskMonthly: null,
+      expectedChurnRiskMonthly: null,
+      expectedReliabilityFailureCostMonthly: null,
+      reliabilityInvestmentMonthly: null,
+      reliabilityAdjustedCostMonthly: null,
+      reliabilityRiskBand: "none",
+      reliabilityDataConfidence: "low"
+    };
+  }
+
+  const minutesInMonth = Math.max(1, toNumber(inputs.minutesInMonth) || DEFAULT_MINUTES_IN_MONTH);
+  const sloTargetAvailabilityPct = clampPercent(inputs.sloTargetAvailabilityPct, 99.9);
+  const sliObservedAvailabilityPct = clampPercent(inputs.sliObservedAvailabilityPct, 99.9);
+  const incidentCountMonthly = Math.max(0, toNumber(inputs.incidentCountMonthly) || 0);
+  const mttrHours = Math.max(0, toNumber(inputs.mttrHours) || 0);
+  const incidentFteCount = Math.max(0, toNumber(inputs.incidentFteCount) || 1);
+  const incidentBlendedHourlyRate = Math.max(0, toNumber(inputs.incidentBlendedHourlyRate) || 0);
+  const criticalRevenuePerMinute = Math.max(0, toNumber(inputs.criticalRevenuePerMinute) || 0);
+  const criticalTrafficSharePct = clampPercent(inputs.criticalTrafficSharePct, 100);
+  const arrExposedMonthly = Math.max(0, toNumber(inputs.arrExposedMonthly) || 0);
+  const churnSensitivityPct = clampPercent(inputs.churnSensitivityPct, 0);
+  const breachProbabilityPct = clampPercent(inputs.breachProbabilityPct, 0);
+  const reliabilityInvestmentMonthly = Math.max(0, toNumber(inputs.reliabilityInvestmentMonthly) || 0);
+  const modeledCostMonthly = Math.max(0, toNumber(existingModeledCostMonthly) || 0);
+
+  const observedAvailability = sliObservedAvailabilityPct / 100;
+  const criticalTrafficShare = criticalTrafficSharePct / 100;
+  const expectedDowntimeMinutes = Math.max(0, (1 - observedAvailability) * minutesInMonth);
+
+  const breachGapPct = Math.max(0, sloTargetAvailabilityPct - sliObservedAvailabilityPct);
+  const penaltyOverride = toNumber(inputs.slaPenaltyMonthly) || 0;
+  const penaltyRatePerBreachPointMonthly = Math.max(0, toNumber(inputs.slaPenaltyRatePerBreachPointMonthly) || 0);
+  const expectedSlaPenaltyMonthly = penaltyOverride > 0
+    ? penaltyOverride
+    : (breachGapPct * penaltyRatePerBreachPointMonthly);
+
+  const expectedIncidentLaborMonthly = incidentCountMonthly * mttrHours * incidentFteCount * incidentBlendedHourlyRate;
+  const expectedRevenueAtRiskMonthly = expectedDowntimeMinutes * criticalRevenuePerMinute * criticalTrafficShare;
+  const expectedChurnRiskMonthly = arrExposedMonthly * (churnSensitivityPct / 100) * (breachProbabilityPct / 100);
+  const expectedReliabilityFailureCostMonthly =
+    expectedSlaPenaltyMonthly +
+    expectedIncidentLaborMonthly +
+    expectedRevenueAtRiskMonthly +
+    expectedChurnRiskMonthly;
+
+  const reliabilityAdjustedCostMonthly =
+    modeledCostMonthly + reliabilityInvestmentMonthly + expectedReliabilityFailureCostMonthly;
+
+  const failureCostShare = reliabilityAdjustedCostMonthly > 0
+    ? expectedReliabilityFailureCostMonthly / reliabilityAdjustedCostMonthly
+    : 0;
+
+  let reliabilityRiskBand = "low";
+  if (failureCostShare >= 0.2 || breachGapPct >= 0.5 || sliObservedAvailabilityPct < 99.0) {
+    reliabilityRiskBand = "high";
+  } else if (failureCostShare >= 0.1 || breachGapPct >= 0.1 || sliObservedAvailabilityPct < 99.5) {
+    reliabilityRiskBand = "medium";
+  }
+
+  const confidenceInputs = [
+    inputs.sloTargetAvailabilityPct,
+    inputs.sliObservedAvailabilityPct,
+    inputs.incidentCountMonthly,
+    inputs.mttrHours,
+    inputs.incidentBlendedHourlyRate,
+    inputs.criticalRevenuePerMinute,
+    inputs.arrExposedMonthly,
+    inputs.churnSensitivityPct,
+    inputs.breachProbabilityPct,
+    inputs.reliabilityInvestmentMonthly
+  ];
+  const providedCount = countProvided(confidenceInputs);
+  let reliabilityDataConfidence = "low";
+  if (providedCount >= 8) {
+    reliabilityDataConfidence = "high";
+  } else if (providedCount >= 5) {
+    reliabilityDataConfidence = "medium";
+  }
+
+  return {
+    enabled: true,
+    sloTargetAvailabilityPct,
+    sliObservedAvailabilityPct,
+    expectedDowntimeMinutes,
+    expectedSlaPenaltyMonthly,
+    expectedIncidentLaborMonthly,
+    expectedRevenueAtRiskMonthly,
+    expectedChurnRiskMonthly,
+    expectedReliabilityFailureCostMonthly,
+    reliabilityInvestmentMonthly,
+    reliabilityAdjustedCostMonthly,
+    reliabilityRiskBand,
+    reliabilityDataConfidence
+  };
+}
+
 export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
   const {
     nRef,
@@ -446,6 +588,7 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
   const reqClientsFromClientsMode = (arpuMode === "startup-clients" && isFiniteNumber(requiredPriceAtTargetClients))
     ? findRequiredClientsForTargetPrice(requiredPriceAtTargetClients, searchMax, model)
     : null;
+
   const normalization = buildNormalizationSnapshot({
     nRef,
     infraTotal,
@@ -456,6 +599,8 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
     costDataCenter,
     costLabor
   });
+  const budgetBasisCost = normalization.totalMonthly > 0 ? normalization.totalMonthly : total;
+  const reliability = computeReliabilityMetrics(inputs, budgetBasisCost);
 
   const beN = economics.breakEvenN;
 
@@ -491,6 +636,7 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
     requiredClientsAtTargetPrice,
     requiredPriceAtTargetClients,
     targetMonthlyRevenue,
+    reliability,
     normalization: {
       selectedDomains: normalization.selectedDomains,
       selectedCount: normalization.selectedCount,
@@ -907,7 +1053,23 @@ export const INPUT_SCHEMA_CALCULATE = {
         costLicensing: { type: ["number", "null"], minimum: 0 },
         costPrivateCloud: { type: ["number", "null"], minimum: 0 },
         costDataCenter: { type: ["number", "null"], minimum: 0 },
-        costLabor: { type: ["number", "null"], minimum: 0 }
+        costLabor: { type: ["number", "null"], minimum: 0 },
+        reliabilityEnabled: { type: ["boolean", "string"], enum: [true, false, "on", "off"] },
+        sloTargetAvailabilityPct: { type: ["number", "null"], minimum: 0, maximum: 100 },
+        sliObservedAvailabilityPct: { type: ["number", "null"], minimum: 0, maximum: 100 },
+        incidentCountMonthly: { type: ["number", "null"], minimum: 0 },
+        mttrHours: { type: ["number", "null"], minimum: 0 },
+        incidentBlendedHourlyRate: { type: ["number", "null"], minimum: 0 },
+        criticalRevenuePerMinute: { type: ["number", "null"], minimum: 0 },
+        arrExposedMonthly: { type: ["number", "null"], minimum: 0 },
+        slaPenaltyRatePerBreachPointMonthly: { type: ["number", "null"], minimum: 0 },
+        reliabilityInvestmentMonthly: { type: ["number", "null"], minimum: 0 },
+        minutesInMonth: { type: ["number", "null"], minimum: 1 },
+        incidentFteCount: { type: ["number", "null"], minimum: 0 },
+        criticalTrafficSharePct: { type: ["number", "null"], minimum: 0, maximum: 100 },
+        churnSensitivityPct: { type: ["number", "null"], minimum: 0, maximum: 100 },
+        breachProbabilityPct: { type: ["number", "null"], minimum: 0, maximum: 100 },
+        slaPenaltyMonthly: { type: ["number", "null"], minimum: 0 }
       }
     },
     providers: {

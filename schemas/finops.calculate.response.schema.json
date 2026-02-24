@@ -52,6 +52,25 @@
         "requiredClientsAtTargetPrice": { "type": ["number", "null"] },
         "requiredPriceAtTargetClients": { "type": ["number", "null"] },
         "targetMonthlyRevenue": { "type": ["number", "null"] },
+        "reliability": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "sloTargetAvailabilityPct": { "type": ["number", "null"] },
+            "sliObservedAvailabilityPct": { "type": ["number", "null"] },
+            "expectedDowntimeMinutes": { "type": ["number", "null"] },
+            "expectedSlaPenaltyMonthly": { "type": ["number", "null"] },
+            "expectedIncidentLaborMonthly": { "type": ["number", "null"] },
+            "expectedRevenueAtRiskMonthly": { "type": ["number", "null"] },
+            "expectedChurnRiskMonthly": { "type": ["number", "null"] },
+            "expectedReliabilityFailureCostMonthly": { "type": ["number", "null"] },
+            "reliabilityInvestmentMonthly": { "type": ["number", "null"] },
+            "reliabilityAdjustedCostMonthly": { "type": ["number", "null"] },
+            "reliabilityRiskBand": { "type": "string", "enum": ["none", "low", "medium", "high"] },
+            "reliabilityDataConfidence": { "type": "string", "enum": ["low", "medium", "high"] }
+          }
+        },
         "normalization": {
           "type": "object",
           "additionalProperties": false,

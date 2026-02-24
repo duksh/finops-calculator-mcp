@@ -93,6 +93,45 @@ async function runContractTests() {
     "series revenue should scale as ARPU * n"
   );
 
+  const reliabilityCalc = calculateTool({
+    inputs: {
+      nRef: 320,
+      devPerClient: 280,
+      infraTotal: 4200,
+      techDomains: ["cloud", "saas"],
+      costSaaS: 500,
+      reliabilityEnabled: "on",
+      sloTargetAvailabilityPct: 99.9,
+      sliObservedAvailabilityPct: 99.35,
+      incidentCountMonthly: 5,
+      mttrHours: 1.7,
+      incidentBlendedHourlyRate: 120,
+      criticalRevenuePerMinute: 42,
+      arrExposedMonthly: 90000,
+      slaPenaltyRatePerBreachPointMonthly: 4500,
+      reliabilityInvestmentMonthly: 2100
+    },
+    options: {
+      includeHealth: false,
+      includeRecommendations: false,
+      includeSeries: false,
+      includeStateToken: false
+    }
+  });
+  assert.equal(reliabilityCalc.outputs.reliability.enabled, true, "reliability output should be enabled when toggle is on");
+  assert.ok(
+    Number.isFinite(reliabilityCalc.outputs.reliability.expectedReliabilityFailureCostMonthly),
+    "reliability failure cost should be numeric"
+  );
+  assert.ok(
+    Number.isFinite(reliabilityCalc.outputs.reliability.reliabilityAdjustedCostMonthly),
+    "reliability adjusted cost should be numeric"
+  );
+  assert.ok(
+    ["low", "medium", "high"].includes(reliabilityCalc.outputs.reliability.reliabilityRiskBand),
+    "reliability risk band should be in expected enum"
+  );
+
   const health = healthTool({
     inputs: {
       devPerClient: 500,
@@ -281,7 +320,17 @@ async function runProtocolTests() {
           infraTotal: 2400,
           startupTargetPrice: 35,
           techDomains: ["cloud", "saas"],
-          costSaaS: 600
+          costSaaS: 600,
+          reliabilityEnabled: "on",
+          sloTargetAvailabilityPct: 99.9,
+          sliObservedAvailabilityPct: 99.7,
+          incidentCountMonthly: 3,
+          mttrHours: 1.3,
+          incidentBlendedHourlyRate: 100,
+          criticalRevenuePerMinute: 28,
+          arrExposedMonthly: 70000,
+          slaPenaltyRatePerBreachPointMonthly: 3500,
+          reliabilityInvestmentMonthly: 1500
         },
         providers: ["aws"]
       }
@@ -305,6 +354,11 @@ async function runProtocolTests() {
     assert.ok(
       payload.recommendations.every((rec) => typeof rec.category === "string"),
       "tools/call recommendations should include category"
+    );
+    assert.equal(payload.outputs.reliability.enabled, true, "tools/call should expose reliability output when enabled");
+    assert.ok(
+      Number.isFinite(payload.outputs.reliability.expectedReliabilityFailureCostMonthly),
+      "tools/call reliability failure cost should be numeric"
     );
 
     let unknownToolError = null;
