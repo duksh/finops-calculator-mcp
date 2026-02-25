@@ -12,6 +12,12 @@ const MODEL_DEFAULTS = Object.freeze({
 const DEFAULT_MINUTES_IN_MONTH = 30 * 24 * 60;
 const DEFAULT_N_REF = 100;
 const SHARE_STATE_VERSION = 1;
+const DEFAULT_CURRENCY_CODE = "EUR";
+const CURRENCY_CODES = Object.freeze(["EUR", "GBP", "USD"]);
+const ACCEPTED_CURRENCY_CODES = Object.freeze([
+  ...CURRENCY_CODES,
+  ...CURRENCY_CODES.map((code) => code.toLowerCase())
+]);
 const UI_MODE_OPTIONS = Object.freeze(["quick", "operator", "architect"]);
 const UI_INTENT_OPTIONS = Object.freeze(["viability", "operations", "architecture", "executive"]);
 const UI_MODE_DEFAULT = "quick";
@@ -113,6 +119,12 @@ function normalizeToggle(value) {
   return lowered === "on" || lowered === "true" || lowered === "1";
 }
 
+function normalizeCurrencyCode(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const normalized = String(value).trim().toUpperCase();
+  return CURRENCY_CODES.includes(normalized) ? normalized : null;
+}
+
 function clampPercent(value, fallback = 0) {
   const n = toNumber(value);
   const base = isFiniteNumber(n) ? n : fallback;
@@ -143,6 +155,7 @@ function normalizeTechDomains(value) {
 export function normalizeInputs(inputs = {}) {
   return {
     nRef: normalizeNumber(inputs.nRef, { min: 1, max: 100000, integer: true }),
+    currency: normalizeCurrencyCode(inputs.currency),
     devPerClient: normalizeNumber(inputs.devPerClient, { min: 0 }),
     infraTotal: normalizeNumber(inputs.infraTotal, { min: 0 }),
     ARPU: normalizeNumber(inputs.ARPU, { min: 0 }),
@@ -963,6 +976,12 @@ function buildSerializedInputState(inputs) {
   const state = {};
   Object.entries(inputs).forEach(([key, value]) => {
     if (key === "techDomains") return;
+    if (key === "currency") {
+      const normalizedCurrency = normalizeCurrencyCode(value);
+      if (!normalizedCurrency || normalizedCurrency === DEFAULT_CURRENCY_CODE) return;
+      state[key] = normalizedCurrency;
+      return;
+    }
     if (value === null || value === undefined || value === "") return;
     state[key] = String(value);
   });
@@ -1083,6 +1102,7 @@ export const INPUT_SCHEMA_CALCULATE = {
       additionalProperties: false,
       properties: {
         nRef: { type: ["number", "null"], minimum: 1, maximum: 100000 },
+        currency: { type: ["string", "null"], enum: [...ACCEPTED_CURRENCY_CODES, null] },
         devPerClient: { type: ["number", "null"], minimum: 0 },
         infraTotal: { type: ["number", "null"], minimum: 0 },
         ARPU: { type: ["number", "null"], minimum: 0 },

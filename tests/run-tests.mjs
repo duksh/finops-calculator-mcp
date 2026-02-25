@@ -255,6 +255,7 @@ async function runContractTests() {
       devPerClient: 500,
       infraTotal: 2400,
       startupTargetPrice: 35,
+      currency: "gbp",
       techDomains: ["cloud", "saas"]
     },
     uiIntent: "operations",
@@ -269,6 +270,7 @@ async function runContractTests() {
   assert.deepEqual(decoded.state.td, ["cloud", "saas"], "decoded domain scope should match encoded state");
   assert.equal(decoded.state.ui, "operations", "decoded ui intent should match encoded context");
   assert.equal(decoded.state.um, "operator", "decoded ui mode should match encoded context");
+  assert.equal(decoded.state.i.currency, "GBP", "decoded state should normalize and preserve non-default currency");
   assert.deepEqual(
     decoded.state.h,
     ["profit", "total-rel", "profit-rel"],
@@ -279,7 +281,8 @@ async function runContractTests() {
     inputs: {
       devPerClient: 500,
       infraTotal: 2400,
-      ARPU: 30
+      ARPU: 30,
+      currency: "usd"
     },
     uiIntent: "executive",
     uiMode: "operator",
@@ -292,9 +295,11 @@ async function runContractTests() {
     }
   });
   assert.ok(typeof calcWithStateContext.stateToken === "string", "calculate should return a state token when enabled");
+  assert.equal(calcWithStateContext.normalizedInputs.currency, "USD", "calculate should normalize currency codes to uppercase");
   const decodedFromCalculate = decodeStateTool({ stateToken: calcWithStateContext.stateToken });
   assert.equal(decodedFromCalculate.state.ui, "executive", "calculate state token should preserve ui intent");
   assert.equal(decodedFromCalculate.state.um, "operator", "calculate state token should preserve ui mode");
+  assert.equal(decodedFromCalculate.state.i.currency, "USD", "calculate state token should preserve non-default currency");
 }
 
 function encodeRpcMessage(message) {

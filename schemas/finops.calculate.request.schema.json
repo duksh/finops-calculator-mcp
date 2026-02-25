@@ -10,6 +10,7 @@
       "additionalProperties": false,
       "properties": {
         "nRef": { "type": ["number", "null"], "minimum": 1, "maximum": 100000 },
+        "currency": { "type": ["string", "null"], "enum": ["EUR", "GBP", "USD", "eur", "gbp", "usd", null] },
         "devPerClient": { "type": ["number", "null"], "minimum": 0 },
         "infraTotal": { "type": ["number", "null"], "minimum": 0 },
         "ARPU": { "type": ["number", "null"], "minimum": 0 },
