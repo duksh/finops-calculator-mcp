@@ -52,6 +52,11 @@
         "requiredClientsAtTargetPrice": { "type": ["number", "null"] },
         "requiredPriceAtTargetClients": { "type": ["number", "null"] },
         "targetMonthlyRevenue": { "type": ["number", "null"] },
+        "reliabilityAdjustedProfit": { "type": ["number", "null"] },
+        "requiredARPU_with_rel": { "type": ["number", "null"] },
+        "arpuUplift_with_rel": { "type": ["number", "null"] },
+        "requiredClients_with_rel": { "type": ["number", "null"] },
+        "extraClients_with_rel": { "type": ["number", "null"] },
         "reliability": {
           "type": "object",
           "additionalProperties": false,
@@ -157,6 +162,26 @@
           "action": { "type": "string" }
         },
         "required": ["title", "priority", "providers", "category", "desc", "action"]
+      }
+    },
+    "series": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "n": { "type": "number" },
+          "dev": { "type": "number" },
+          "infraRaw": { "type": "number" },
+          "infraCud": { "type": "number" },
+          "total": { "type": "number" },
+          "totalRel": { "type": ["number", "null"] },
+          "revenue": { "type": "number" },
+          "profit": { "type": "number" },
+          "profitRel": { "type": ["number", "null"] },
+          "priceMin": { "type": "number" }
+        },
+        "required": ["n", "dev", "infraRaw", "infraCud", "total", "totalRel", "revenue", "profit", "profitRel", "priceMin"]
       }
     },
     "stateToken": { "type": ["string", "null"] }

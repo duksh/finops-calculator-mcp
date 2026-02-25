@@ -18,7 +18,7 @@ const UI_MODE_DEFAULT = "quick";
 const UI_INTENT_DEFAULT = "viability";
 
 const PROVIDERS = Object.freeze(["aws", "azure", "gcp", "oci", "ibm", "alibaba", "huawei", "multi"]);
-const CURVE_KEYS = Object.freeze(["dev", "infra-raw", "infra-cud", "total", "revenue", "profit", "price-min"]);
+const CURVE_KEYS = Object.freeze(["dev", "infra-raw", "infra-cud", "total", "total-rel", "revenue", "profit", "profit-rel", "price-min"]);
 const TECH_DOMAIN_SCHEMA = Object.freeze([
   { key: "cloud", inputKey: "infraTotal", label: "Cloud" },
   { key: "saas", inputKey: "costSaaS", label: "SaaS" },
@@ -228,8 +228,12 @@ function normalizeOptions(options = {}) {
   };
 }
 
-export function buildData(model, points = 300) {
+export function buildData(model, points = 300, reliabilityLoadMonthly = null) {
   const { K, a, c, b, ARPU, m, nMax } = model;
+  const normalizedReliabilityLoad = Number.isFinite(reliabilityLoadMonthly)
+    ? Math.max(0, Number(reliabilityLoadMonthly) || 0)
+    : null;
+  const hasReliabilityOverlay = Number.isFinite(normalizedReliabilityLoad);
   const totalPoints = Math.max(10, Math.round(points));
 
   const rows = [];
@@ -242,7 +246,9 @@ export function buildData(model, points = 300) {
     const revenue = ARPU * n;
     const profit = revenue - total;
     const priceMin = total * (1 + m);
-    rows.push({ n, dev, infraRaw, infraCud, total, revenue, profit, priceMin });
+    const totalRel = hasReliabilityOverlay ? total + normalizedReliabilityLoad : null;
+    const profitRel = hasReliabilityOverlay ? revenue - totalRel : null;
+    rows.push({ n, dev, infraRaw, infraCud, total, totalRel, revenue, profit, profitRel, priceMin });
   }
   return rows;
 }
@@ -292,6 +298,19 @@ export function findRequiredClientsForTargetPrice(targetPrice, maxN, model) {
 
   for (let n = 1; n <= limit; n += 1) {
     if (minPriceAtClients(n, model) <= targetPrice) return n;
+  }
+  return null;
+}
+
+export function findRequiredClientsForTargetPriceWithReliability(targetPrice, maxN, reliabilityLoadMonthly = 0, model) {
+  if (!(targetPrice > 0)) return null;
+  const limit = Math.max(1, Math.round(maxN));
+  const reliabilityLoad = Math.max(0, Number(reliabilityLoadMonthly) || 0);
+
+  for (let n = 1; n <= limit; n += 1) {
+    const baseTotal = totalCostAtClients(n, model);
+    const adjustedMinPrice = ((baseTotal + reliabilityLoad) / Math.max(1, n)) * (1 + model.m);
+    if (adjustedMinPrice <= targetPrice) return n;
   }
   return null;
 }
@@ -601,6 +620,10 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
   });
   const budgetBasisCost = normalization.totalMonthly > 0 ? normalization.totalMonthly : total;
   const reliability = computeReliabilityMetrics(inputs, budgetBasisCost);
+  const hasReliabilitySignal = Boolean(reliability && reliability.enabled && reliability.expectedReliabilityFailureCostMonthly !== null);
+  const reliabilityLoadMonthly = hasReliabilitySignal
+    ? (Math.max(0, Number(reliability.reliabilityInvestmentMonthly) || 0) + Math.max(0, Number(reliability.expectedReliabilityFailureCostMonthly) || 0))
+    : null;
 
   const beN = economics.breakEvenN;
 
@@ -626,6 +649,22 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
     targetMonthlyRevenue = startupTargetPrice * requiredClientsAtTargetPrice;
   }
 
+  const reliabilityAdjustedProfit = hasARPU && reliability.reliabilityAdjustedCostMonthly !== null
+    ? (revenue - reliability.reliabilityAdjustedCostMonthly)
+    : null;
+  const requiredARPU_with_rel = reliability.reliabilityAdjustedCostMonthly !== null
+    ? (reliability.reliabilityAdjustedCostMonthly / Math.max(1, nSample)) * (1 + model.m)
+    : null;
+  const arpuUplift_with_rel = hasARPU && requiredARPU_with_rel !== null
+    ? Math.max(0, requiredARPU_with_rel - arpuUsed)
+    : null;
+  const requiredClients_with_rel = hasARPU && hasAnyCostInput && reliabilityLoadMonthly !== null
+    ? findRequiredClientsForTargetPriceWithReliability(arpuUsed, searchMax, reliabilityLoadMonthly, model)
+    : null;
+  const extraClients_with_rel = requiredClients_with_rel !== null
+    ? Math.max(0, Math.ceil(requiredClients_with_rel - nSample))
+    : null;
+
   return {
     breakEvenClients,
     minPricePerClient: hasAnyCostInput ? minPricePerClient : null,
@@ -636,6 +675,11 @@ export function computeOutputs(inputs, model, effectiveARPU, arpuMode) {
     requiredClientsAtTargetPrice,
     requiredPriceAtTargetClients,
     targetMonthlyRevenue,
+    reliabilityAdjustedProfit,
+    requiredARPU_with_rel,
+    arpuUplift_with_rel,
+    requiredClients_with_rel,
+    extraClients_with_rel,
     reliability,
     normalization: {
       selectedDomains: normalization.selectedDomains,
@@ -1021,7 +1065,10 @@ export function calculateTool(args = {}) {
   };
 
   if (options.includeSeries) {
-    result.series = buildData(derived.model);
+    const reliabilitySeriesLoad = outputs.reliability && outputs.reliability.enabled && outputs.reliability.expectedReliabilityFailureCostMonthly !== null
+      ? (Math.max(0, Number(outputs.reliability.reliabilityInvestmentMonthly) || 0) + Math.max(0, Number(outputs.reliability.expectedReliabilityFailureCostMonthly) || 0))
+      : null;
+    result.series = buildData(derived.model, 300, reliabilitySeriesLoad);
   }
 
   return result;

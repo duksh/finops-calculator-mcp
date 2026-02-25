@@ -20,6 +20,7 @@ const EXPECTED_SHARE_STATE_VERSION = 1;
 const EXPECTED_DOMAINS = Object.freeze(["cloud", "saas", "licensing", "private-cloud", "data-center", "labor"]);
 const EXPECTED_UI_MODES = Object.freeze(["quick", "operator", "architect"]);
 const EXPECTED_UI_INTENTS = Object.freeze(["viability", "operations", "architecture", "executive"]);
+const EXPECTED_CURVE_KEYS = Object.freeze(["dev", "infra-raw", "infra-cud", "total", "total-rel", "revenue", "profit", "profit-rel", "price-min"]);
 const REQUIRED_INPUT_IDS = Object.freeze([
   "inp-techDomains",
   "inp-costSaaS",
@@ -216,6 +217,11 @@ function runReliabilityParityFixtures(reliabilityEngine) {
 
     const reliability = mcpResult.outputs.reliability;
     assert.ok(reliability && typeof reliability === "object", `Fixture ${fixture.name}: missing reliability output object`);
+    assert.ok(Object.prototype.hasOwnProperty.call(mcpResult.outputs, "reliabilityAdjustedProfit"), `Fixture ${fixture.name}: missing reliabilityAdjustedProfit`);
+    assert.ok(Object.prototype.hasOwnProperty.call(mcpResult.outputs, "requiredARPU_with_rel"), `Fixture ${fixture.name}: missing requiredARPU_with_rel`);
+    assert.ok(Object.prototype.hasOwnProperty.call(mcpResult.outputs, "arpuUplift_with_rel"), `Fixture ${fixture.name}: missing arpuUplift_with_rel`);
+    assert.ok(Object.prototype.hasOwnProperty.call(mcpResult.outputs, "requiredClients_with_rel"), `Fixture ${fixture.name}: missing requiredClients_with_rel`);
+    assert.ok(Object.prototype.hasOwnProperty.call(mcpResult.outputs, "extraClients_with_rel"), `Fixture ${fixture.name}: missing extraClients_with_rel`);
 
     const nSample = fixture.inputs.nRef || 100;
     const totalCoreCostAtSample =
@@ -251,6 +257,34 @@ function runReliabilityParityFixtures(reliabilityEngine) {
         approxEqual(reliability[key], expected[key], `Fixture ${fixture.name}: ${key}`);
       }
     });
+
+    if (expected.reliabilityAdjustedCostMonthly === null) {
+      assert.equal(mcpResult.outputs.requiredARPU_with_rel, null, `Fixture ${fixture.name}: requiredARPU_with_rel should be null`);
+    } else {
+      const expectedRequiredArpu = (expected.reliabilityAdjustedCostMonthly / Math.max(1, nSample)) * (1 + mcpResult.model.m);
+      approxEqual(mcpResult.outputs.requiredARPU_with_rel, expectedRequiredArpu, `Fixture ${fixture.name}: requiredARPU_with_rel`);
+    }
+
+    assert.equal(
+      mcpResult.outputs.reliabilityAdjustedProfit,
+      null,
+      `Fixture ${fixture.name}: reliabilityAdjustedProfit should be null when ARPU is not provided`
+    );
+    assert.equal(
+      mcpResult.outputs.requiredClients_with_rel,
+      null,
+      `Fixture ${fixture.name}: requiredClients_with_rel should be null when ARPU is not provided`
+    );
+    assert.equal(
+      mcpResult.outputs.extraClients_with_rel,
+      null,
+      `Fixture ${fixture.name}: extraClients_with_rel should be null when ARPU is not provided`
+    );
+    assert.equal(
+      mcpResult.outputs.arpuUplift_with_rel,
+      null,
+      `Fixture ${fixture.name}: arpuUplift_with_rel should be null when ARPU is not provided`
+    );
   });
 }
 
@@ -283,6 +317,9 @@ export async function runCrossRepoParityGuard(
 
   const uiIntents = parseStringArrayConstant(html, "UI_INTENT_OPTIONS");
   assert.deepEqual(uiIntents, [...EXPECTED_UI_INTENTS], "UI intent options drift detected between calculator UI and MCP");
+
+  const curveKeys = parseStringArrayConstant(html, "SHAREABLE_CURVE_KEYS");
+  assert.deepEqual(curveKeys, [...EXPECTED_CURVE_KEYS], "Shareable curve keys drift detected between calculator UI and MCP");
 
   assert.ok(
     html.includes("Multi-Domain Normalized Tech Cost"),

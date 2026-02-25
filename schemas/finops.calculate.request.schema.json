@@ -64,7 +64,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["dev", "infra-raw", "infra-cud", "total", "revenue", "profit", "price-min"]
+        "enum": ["dev", "infra-raw", "infra-cud", "total", "total-rel", "revenue", "profit", "profit-rel", "price-min"]
       },
       "uniqueItems": true
     },

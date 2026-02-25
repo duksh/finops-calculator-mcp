@@ -92,12 +92,15 @@ async function runContractTests() {
     Math.round(withSeries.model.ARPU * lastPoint.n),
     "series revenue should scale as ARPU * n"
   );
+  assert.equal(lastPoint.totalRel, null, "series should keep totalRel null when reliability overlay is inactive");
+  assert.equal(lastPoint.profitRel, null, "series should keep profitRel null when reliability overlay is inactive");
 
   const reliabilityCalc = calculateTool({
     inputs: {
       nRef: 320,
       devPerClient: 280,
       infraTotal: 4200,
+      ARPU: 34,
       techDomains: ["cloud", "saas"],
       costSaaS: 500,
       reliabilityEnabled: "on",
@@ -130,6 +133,85 @@ async function runContractTests() {
   assert.ok(
     ["low", "medium", "high"].includes(reliabilityCalc.outputs.reliability.reliabilityRiskBand),
     "reliability risk band should be in expected enum"
+  );
+  assert.ok(
+    Number.isFinite(reliabilityCalc.outputs.reliabilityAdjustedProfit),
+    "reliability adjusted profit should be numeric when ARPU and reliability inputs are present"
+  );
+  assert.ok(
+    Number.isFinite(reliabilityCalc.outputs.requiredARPU_with_rel),
+    "required ARPU with reliability should be numeric"
+  );
+  assert.ok(
+    Number.isFinite(reliabilityCalc.outputs.arpuUplift_with_rel),
+    "ARPU uplift with reliability should be numeric"
+  );
+  assert.ok(
+    Number.isFinite(reliabilityCalc.outputs.requiredClients_with_rel) || reliabilityCalc.outputs.requiredClients_with_rel === null,
+    "required clients with reliability should be numeric or null when outside modeled range"
+  );
+  assert.ok(
+    Number.isFinite(reliabilityCalc.outputs.extraClients_with_rel) || reliabilityCalc.outputs.extraClients_with_rel === null,
+    "extra clients with reliability should be numeric or null when outside modeled range"
+  );
+
+  const expectedArpuUplift = Math.max(0, reliabilityCalc.outputs.requiredARPU_with_rel - reliabilityCalc.meta.effectiveARPU);
+  assert.equal(
+    Math.round(reliabilityCalc.outputs.arpuUplift_with_rel * 1e6),
+    Math.round(expectedArpuUplift * 1e6),
+    "ARPU uplift should equal max(0, requiredARPU_with_rel - effectiveARPU)"
+  );
+
+  if (reliabilityCalc.outputs.requiredClients_with_rel === null) {
+    assert.equal(
+      reliabilityCalc.outputs.extraClients_with_rel,
+      null,
+      "extra clients should be null when required clients with reliability is null"
+    );
+  } else {
+    const expectedExtraClients = Math.max(
+      0,
+      Math.ceil(reliabilityCalc.outputs.requiredClients_with_rel - reliabilityCalc.normalizedInputs.nRef)
+    );
+    assert.equal(
+      reliabilityCalc.outputs.extraClients_with_rel,
+      expectedExtraClients,
+      "extra clients should equal ceil(requiredClients_with_rel - nRef) with floor at 0"
+    );
+  }
+
+  const reliabilitySeriesCalc = calculateTool({
+    inputs: {
+      nRef: 320,
+      devPerClient: 280,
+      infraTotal: 4200,
+      ARPU: 34,
+      reliabilityEnabled: "on",
+      sloTargetAvailabilityPct: 99.9,
+      sliObservedAvailabilityPct: 99.35,
+      incidentCountMonthly: 5,
+      mttrHours: 1.7,
+      incidentBlendedHourlyRate: 120,
+      criticalRevenuePerMinute: 42,
+      arrExposedMonthly: 90000,
+      slaPenaltyRatePerBreachPointMonthly: 4500,
+      reliabilityInvestmentMonthly: 2100
+    },
+    options: {
+      includeHealth: false,
+      includeRecommendations: false,
+      includeSeries: true,
+      includeStateToken: false
+    }
+  });
+  assert.ok(Array.isArray(reliabilitySeriesCalc.series), "reliability includeSeries should return points");
+  const relSeriesLastPoint = reliabilitySeriesCalc.series[reliabilitySeriesCalc.series.length - 1];
+  assert.ok(Number.isFinite(relSeriesLastPoint.totalRel), "reliability series should include totalRel");
+  assert.ok(Number.isFinite(relSeriesLastPoint.profitRel), "reliability series should include profitRel");
+  assert.equal(
+    Math.round((relSeriesLastPoint.revenue - relSeriesLastPoint.totalRel) * 1e6),
+    Math.round(relSeriesLastPoint.profitRel * 1e6),
+    "profitRel should equal revenue - totalRel"
   );
 
   const health = healthTool({
@@ -178,7 +260,7 @@ async function runContractTests() {
     uiIntent: "operations",
     uiMode: "operator",
     providers: ["aws"],
-    hiddenCurves: ["profit"]
+    hiddenCurves: ["profit", "total-rel", "profit-rel"]
   });
   assert.ok(typeof encoded.stateToken === "string" && encoded.stateToken.length > 0, "state token should be non-empty string");
 
@@ -187,6 +269,11 @@ async function runContractTests() {
   assert.deepEqual(decoded.state.td, ["cloud", "saas"], "decoded domain scope should match encoded state");
   assert.equal(decoded.state.ui, "operations", "decoded ui intent should match encoded context");
   assert.equal(decoded.state.um, "operator", "decoded ui mode should match encoded context");
+  assert.deepEqual(
+    decoded.state.h,
+    ["profit", "total-rel", "profit-rel"],
+    "decoded hidden curves should preserve reliability overlay curve keys"
+  );
 
   const calcWithStateContext = calculateTool({
     inputs: {
