@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ficecal-agent-hub
+    runtime: node
+    plan: free
+    rootDir: server/agents
+    buildCommand: npm install
+    startCommand: npm run start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: PORT
+        value: 10000
+      - key: ALLOWED_ORIGIN
+        value: https://duksh.github.io
+      - key: AGENT_WORKFLOW_PATH
+        value: ./workflows/triage.workflow.v1.json
+      - key: A2A_ENABLED
+        value: "false"

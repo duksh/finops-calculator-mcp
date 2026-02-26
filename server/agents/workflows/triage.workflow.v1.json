@@ -1,0 +1,62 @@
+{
+  "workflowId": "triage.workflow.v1",
+  "name": "FiceCal Triage Workflow",
+  "version": "1.0.0",
+  "description": "Deterministic triage workflow that converts FinOps calculator outputs into top-priority actions and executive summary.",
+  "entrypoint": "validate_input",
+  "nodes": [
+    {
+      "id": "validate_input",
+      "type": "validator",
+      "config": {
+        "schema": "../contracts/finops.agent.triage.request.schema.json",
+        "onFailStatus": "needs-input"
+      },
+      "next": "calculate_baseline"
+    },
+    {
+      "id": "calculate_baseline",
+      "type": "tool_call",
+      "config": {
+        "tool": "finops.calculate",
+        "arguments": {
+          "inputs": "$request.inputs",
+          "providers": "$request.providers",
+          "options": {
+            "includeHealth": true,
+            "includeRecommendations": true,
+            "includeSeries": false,
+            "includeStateToken": true
+          }
+        }
+      },
+      "next": "rank_actions"
+    },
+    {
+      "id": "rank_actions",
+      "type": "transform",
+      "config": {
+        "strategy": "recommendation_priority_then_order",
+        "maxActionsFrom": "$request.context.maxActions",
+        "defaultMaxActions": 3
+      },
+      "next": "compose_summary"
+    },
+    {
+      "id": "compose_summary",
+      "type": "compose",
+      "config": {
+        "template": "triage.summary.v1",
+        "includeAssumptionsFrom": "$calculate_baseline.meta.warnings"
+      },
+      "next": "emit_response"
+    },
+    {
+      "id": "emit_response",
+      "type": "response",
+      "config": {
+        "schema": "../contracts/finops.agent.triage.response.schema.json"
+      }
+    }
+  ]
+}

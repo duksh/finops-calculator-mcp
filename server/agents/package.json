@@ -1,0 +1,14 @@
+{
+  "name": "ficecal-agent-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Render-ready HTTP agent hub skeleton for FiceCal MCP",
+  "scripts": {
+    "start": "node api-server.js",
+    "check": "node --check api-server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -35,7 +35,14 @@ Release 3 for MCP focuses on UI-aware state parity and first-timer flow compatib
 - `server/finops-core.js` - extracted pure calculator logic for MCP handlers
 - `server/index.js` - MCP stdio server with tool registration and JSON-RPC handling
 - `server/package.json` - scripts for local run/check/test
+- `docs/agents/private-adk-a2a-render-spec.md` - private implementation spec for Agent Hub (ADK + A2A path) on Render
+- `server/agents/api-server.js` - Render-ready HTTP agent hub skeleton (`/healthz`, `/v1/agent/triage`)
+- `server/agents/contracts/*` - exact v1 triage request/response contracts + tool contract guide
+- `server/agents/workflows/triage.workflow.v1.json` - first workflow definition mapped to existing FinOps MCP logic
+- `server/agents/render/render.yaml` - Render Blueprint config (free-tier profile)
+- `server/agents/render/smoke-triage.sh` - local/CI smoke test for `/healthz` and `/v1/agent/triage`
 - `tests/run-tests.mjs` - contract and JSON-RPC protocol tests
+- `tests/validate-agent-artifacts.mjs` - validates agent schemas + workflow linkage integrity
 - `tests/parity-finops-calculator.mjs` - cross-repo parity guard against `duksh/finops-calculator` main `index.html`
 - `.github/workflows/mcp-parity.yml` - CI pipeline running syntax, tests, and parity guard
 
@@ -85,7 +92,9 @@ See client-config-examples.md
 
 1. Add scenario-based golden fixtures for regression coverage.
 2. Add optional schema-runtime validation in server request handling.
-3. Add hosted transport support if you need shared multi-user access.
+3. Wire `server/agents` into CI (syntax + contract validation + smoke endpoint test).
+4. Add ADK runtime adapter behind the same v1 triage contract.
+5. Add A2A capability card + task endpoint (`/v1/a2a/*`) when cross-agent integration is needed.
 
 ## License
 

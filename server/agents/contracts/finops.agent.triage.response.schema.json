@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finops.agent.triage.response.schema.json",
+  "title": "finops.agent.triage response",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "requestId": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "needs-input", "error"]
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "goal": {
+          "type": "string"
+        },
+        "currentZoneKey": {
+          "type": "string",
+          "enum": ["green", "yellow", "red", "awaiting"]
+        },
+        "currentZoneTitle": {
+          "type": "string"
+        },
+        "currentScore": {
+          "type": ["number", "null"]
+        },
+        "headline": {
+          "type": "string"
+        }
+      },
+      "required": ["goal", "currentZoneKey", "currentZoneTitle", "currentScore", "headline"]
+    },
+    "actionPlan": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rank": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+          "category": { "type": "string", "enum": ["infrastructure", "pricing", "marketing", "crm", "governance"] },
+          "action": { "type": "string" },
+          "rationale": { "type": "string" }
+        },
+        "required": ["rank", "title", "priority", "category", "action", "rationale"]
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflowId": { "type": "string" },
+        "sourceTools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "stateTokenIncluded": { "type": "boolean" }
+      },
+      "required": ["workflowId", "sourceTools", "stateTokenIncluded"]
+    },
+    "raw": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "health": { "type": ["object", "null"] },
+        "recommendations": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "stateToken": { "type": ["string", "null"] }
+      },
+      "required": ["health", "recommendations", "stateToken"]
+    },
+    "error": {
+      "type": "string"
+    }
+  },
+  "required": ["status"]
+}

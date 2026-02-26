@@ -26,6 +26,12 @@ jobs:
         working-directory: server
         run: npm run test
 
+      - name: Agent contracts + workflow validation
+        run: node tests/validate-agent-artifacts.mjs
+
+      - name: Agent triage smoke test
+        run: bash server/agents/render/smoke-triage.sh
+
       - name: Cross-repo calculator parity
         working-directory: server
         env:

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finops.agent.triage.request.schema.json",
+  "title": "finops.agent.triage request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "inputs": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": true
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["aws", "azure", "gcp", "oci", "ibm", "alibaba", "huawei", "multi"]
+      },
+      "uniqueItems": true
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "goal": {
+          "type": "string",
+          "enum": [
+            "improve-health-zone",
+            "reduce-ccer",
+            "improve-margin",
+            "optimize-reliability-cost",
+            "board-brief"
+          ]
+        },
+        "audience": {
+          "type": "string",
+          "enum": ["founder", "cto", "cfo", "coo", "finops", "product"]
+        },
+        "targetZone": {
+          "type": "string",
+          "enum": ["green", "yellow", "red", "awaiting"]
+        },
+        "maxActions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3
+        },
+        "timeHorizonDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 90
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "includeStateToken": {
+          "type": "boolean",
+          "default": true
+        },
+        "includeRaw": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  },
+  "required": ["inputs"]
+}
