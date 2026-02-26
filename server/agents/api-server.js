@@ -84,6 +84,19 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url === "/") {
+    json(res, 200, {
+      status: "ok",
+      service: "ficecal-agent-hub",
+      docs: {
+        health: "GET /healthz",
+        triage: "POST /v1/agent/triage"
+      },
+      usage: "Call from FiceCal via ?agentApi=<baseUrl> or default frontend fallback endpoint."
+    }, origin);
+    return;
+  }
+
   if (req.method === "POST" && req.url === "/v1/agent/triage") {
     try {
       const body = await readJsonBody(req);
